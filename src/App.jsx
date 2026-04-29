@@ -61,6 +61,18 @@ const PALETTE = [
   { key: 'note',     kind: 'sticky',                     label: 'Notă',     dot: '#fbbf24', sample: 'note'   },
 ];
 
+// 60-30-10 fill palette — toate respectă tematica red/white/black
+const FILL_COLORS = [
+  { key: 'reset',    label: 'Default',  bg: null,        fg: null,      border: null,      hint: 'Resetează la culoarea default' },
+  { key: 'snow',     label: 'Snow',     bg: '#fafafa',   fg: '#0a0a0a', border: '#0a0a0a', hint: 'Off-white' },
+  { key: 'ash',      label: 'Ash',      bg: '#e5e5e5',   fg: '#0a0a0a', border: '#0a0a0a', hint: 'Gri deschis' },
+  { key: 'butter',   label: 'Butter',   bg: '#fff8c5',   fg: '#0a0a0a', border: '#0a0a0a', hint: 'Galben sticky' },
+  { key: 'blush',    label: 'Blush',    bg: '#fce7e8',   fg: '#0a0a0a', border: '#0a0a0a', hint: 'Roșu washed' },
+  { key: 'danger',   label: 'Danger',   bg: '#e11d3f',   fg: '#ffffff', border: '#0a0a0a', hint: 'Roșu plin' },
+  { key: 'wine',     label: 'Wine',     bg: '#7a0e22',   fg: '#ffffff', border: '#0a0a0a', hint: 'Roșu închis' },
+  { key: 'noir',     label: 'Noir',     bg: '#0a0a0a',   fg: '#ffffff', border: '#0a0a0a', hint: 'Negru' },
+];
+
 const initialNodes = [
   {
     id: 'n-start',
@@ -119,6 +131,7 @@ function FlowInner({ onBackToHero }) {
   const bumpUi = () => forceTick((t) => t + 1);
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [contextMenu, setContextMenu] = useState(null);
+  const [nodeMenu, setNodeMenu] = useState(null);
   const fileHandleRef = useRef(null);
   const [linkedFile, setLinkedFile] = useState(null);
   const legacyImportInputRef = useRef(null);
@@ -217,7 +230,78 @@ function FlowInner({ onBackToHero }) {
     [rf],
   );
 
-  const closeContextMenu = useCallback(() => setContextMenu(null), []);
+  const closeContextMenu = useCallback(() => {
+    setContextMenu(null);
+    setNodeMenu(null);
+  }, []);
+
+  const onNodeContextMenu = useCallback(
+    (e, node) => {
+      e.preventDefault();
+      if (!wrapperRef.current) return;
+      const rect = wrapperRef.current.getBoundingClientRect();
+      const menuW = 240;
+      const menuH = 240;
+      const localX = e.clientX - rect.left;
+      const localY = e.clientY - rect.top;
+      setContextMenu(null);
+      setNodeMenu({
+        x: Math.min(localX, rect.width - menuW - 8),
+        y: Math.min(localY, rect.height - menuH - 8),
+        nodeId: node.id,
+      });
+    },
+    [],
+  );
+
+  const setNodeFill = (nodeId, color) => {
+    snapshot();
+    setNodes((nds) =>
+      nds.map((n) => {
+        if (n.id !== nodeId) return n;
+        if (color.key === 'reset') {
+          const { background, color: _c, borderColor, ...restStyle } = n.style || {};
+          const newData = { ...n.data };
+          delete newData.fillColor;
+          return { ...n, data: newData, style: restStyle };
+        }
+        const fill = { bg: color.bg, fg: color.fg, border: color.border };
+        if (n.type === 'default' || !n.type) {
+          return {
+            ...n,
+            style: {
+              ...(n.style || {}),
+              background: color.bg,
+              color: color.fg,
+              borderColor: color.border,
+            },
+          };
+        }
+        return { ...n, data: { ...n.data, fillColor: fill } };
+      }),
+    );
+  };
+
+  const deleteNodeById = (nodeId) => {
+    snapshot();
+    setNodes((nds) => nds.filter((n) => n.id !== nodeId));
+    setEdges((eds) =>
+      eds.filter((e) => e.source !== nodeId && e.target !== nodeId),
+    );
+  };
+
+  const duplicateNodeById = (nodeId) => {
+    const orig = nodes.find((n) => n.id === nodeId);
+    if (!orig) return;
+    snapshot();
+    const copy = {
+      ...orig,
+      id: makeId(),
+      position: { x: orig.position.x + 30, y: orig.position.y + 30 },
+      selected: false,
+    };
+    setNodes((nds) => [...nds, copy]);
+  };
 
   const onNodeDoubleClick = (_, node) => setEditingNodeId(node.id);
 
@@ -613,6 +697,7 @@ function FlowInner({ onBackToHero }) {
           onEdgeDoubleClick={onEdgeDoubleClick}
           onNodeDragStart={snapshot}
           onPaneContextMenu={onPaneContextMenu}
+          onNodeContextMenu={onNodeContextMenu}
           onPaneClick={closeContextMenu}
           onMoveStart={closeContextMenu}
           defaultEdgeOptions={{
@@ -672,7 +757,7 @@ function FlowInner({ onBackToHero }) {
           </div>
         )}
 
-        {/* Context menu */}
+        {/* Pane context menu (right-click pe canvas) */}
         {contextMenu && (
           <div
             className="absolute z-[90] w-[220px] border-[2.5px] border-black bg-white p-1 shadow-[6px_6px_0_0_#000]"
@@ -698,12 +783,97 @@ function FlowInner({ onBackToHero }) {
             ))}
           </div>
         )}
+
+        {/* Node context menu (right-click pe bulă) */}
+        {nodeMenu && (
+          <div
+            className="absolute z-[90] w-[240px] border-[2.5px] border-black bg-white p-1 shadow-[6px_6px_0_0_#000]"
+            style={{ left: nodeMenu.x, top: nodeMenu.y }}
+            onContextMenu={(e) => e.preventDefault()}
+          >
+            <div className="border-b-2 border-black bg-black px-3 py-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.25em] text-white">
+              Bulă · Acțiuni
+            </div>
+
+            <button
+              onClick={() => {
+                setEditingNodeId(nodeMenu.nodeId);
+                setNodeMenu(null);
+              }}
+              className="flex w-full items-center gap-3 px-3 py-2 text-left font-bold text-[12px] uppercase tracking-wider hover:bg-[var(--color-fg)] hover:text-white"
+            >
+              <span className="inline-flex h-4 w-4 items-center justify-center border-2 border-current font-mono text-[9px]">A</span>
+              Editează text
+            </button>
+
+            <button
+              onClick={() => {
+                duplicateNodeById(nodeMenu.nodeId);
+                setNodeMenu(null);
+              }}
+              className="flex w-full items-center gap-3 px-3 py-2 text-left font-bold text-[12px] uppercase tracking-wider hover:bg-[var(--color-fg)] hover:text-white"
+            >
+              <span className="inline-flex h-4 w-4 items-center justify-center border-2 border-current font-mono text-[9px]">+</span>
+              Duplică
+            </button>
+
+            <div className="my-1 h-[2px] bg-black" />
+
+            <div className="px-3 py-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.25em] text-[var(--color-fg-soft)]">
+              Umple cu
+            </div>
+            <div className="grid grid-cols-4 gap-1 px-2 pb-2">
+              {FILL_COLORS.map((c) => (
+                <button
+                  key={c.key}
+                  title={`${c.label} — ${c.hint}`}
+                  onClick={() => {
+                    setNodeFill(nodeMenu.nodeId, c);
+                    setNodeMenu(null);
+                  }}
+                  className={cn(
+                    'group relative h-9 w-full border-[2.5px] border-black',
+                    'transition-transform duration-100 hover:-translate-y-[1px] hover:shadow-[2px_2px_0_0_#000]',
+                  )}
+                  style={
+                    c.key === 'reset'
+                      ? {
+                          backgroundImage:
+                            'repeating-linear-gradient(45deg, #fff 0 4px, #e5e5e5 4px 8px)',
+                        }
+                      : { background: c.bg }
+                  }
+                >
+                  {c.key === 'reset' && (
+                    <X
+                      className="absolute inset-0 m-auto h-4 w-4"
+                      strokeWidth={3}
+                    />
+                  )}
+                </button>
+              ))}
+            </div>
+
+            <div className="my-1 h-[2px] bg-black" />
+
+            <button
+              onClick={() => {
+                deleteNodeById(nodeMenu.nodeId);
+                setNodeMenu(null);
+              }}
+              className="flex w-full items-center gap-3 px-3 py-2 text-left font-bold text-[12px] uppercase tracking-wider text-[var(--color-danger)] hover:bg-[var(--color-danger)] hover:text-white"
+            >
+              <Trash2 className="h-3.5 w-3.5" strokeWidth={2.5} />
+              Șterge
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ───── Status bar ───── */}
       <footer className="flex flex-wrap items-center justify-between gap-3 border-t-[3px] border-black bg-black px-4 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-white">
         <span className="text-white/80">
-          drag = select · <span className="text-[var(--color-danger)]">space</span>+drag = pan · right-click = adaugă · 2× click pe edge = șterge · ctrl+z = undo
+          drag = select · <span className="text-[var(--color-danger)]">space</span>+drag = pan · right-click pe canvas = adaugă · right-click pe bulă = umple/șterge · 2× click pe edge = șterge · ctrl+z = undo
         </span>
         <span className="text-white/40">
           {nodes.length} noduri · {edges.length} edges

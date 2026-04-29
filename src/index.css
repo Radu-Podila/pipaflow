@@ -69,9 +69,9 @@ button { font-family: inherit; }
 .react-flow__node-default {
   white-space: pre-line !important;
   text-align: center;
-  color: var(--color-fg) !important;
-  background: var(--color-bg) !important;
-  border: 2.5px solid var(--color-line) !important;
+  color: var(--color-fg);
+  background: var(--color-bg);
+  border: 2.5px solid var(--color-line);
   border-radius: 0 !important;
   padding: 12px 16px !important;
   box-shadow: none !important;
@@ -80,9 +80,8 @@ button { font-family: inherit; }
 }
 
 .react-flow__node-default.selected {
-  background: var(--color-danger-glow) !important;
-  border-color: var(--color-danger) !important;
-  box-shadow: none !important;
+  outline: 3px solid var(--color-danger);
+  outline-offset: 3px;
 }
 
 .react-flow__handle {

@@ -5,16 +5,31 @@ import { cn } from '@/lib/utils';
 const HANDLE_CLASS =
   '!w-[10px] !h-[10px] !bg-black !border-2 !border-white !rounded-none';
 
+function fillStyle(fill, defaults) {
+  if (!fill) return defaults;
+  return {
+    background: fill.bg ?? defaults.background,
+    color: fill.fg ?? defaults.color,
+    borderColor: fill.border ?? defaults.borderColor,
+  };
+}
+
 export const StickyNote = memo(function StickyNote({ data, selected }) {
+  const style = fillStyle(data.fillColor, {
+    background: '#fff8c5',
+    color: '#0a0a0a',
+    borderColor: '#0a0a0a',
+  });
   return (
     <div
+      style={style}
       className={cn(
         'min-w-[140px] max-w-[220px] whitespace-pre-wrap break-words',
-        'bg-[#fff8c5] text-black px-4 py-3',
-        'border-[2.5px] border-black',
+        'px-4 py-3',
+        'border-[2.5px]',
         'font-hand text-[16px] leading-tight font-medium',
         '-rotate-[1.2deg]',
-        selected && 'border-[var(--color-danger)] rotate-0',
+        selected && 'rotate-0 outline-3 outline-offset-3 outline-[var(--color-danger)]',
       )}
     >
       {data.label || 'Notă'}
@@ -23,17 +38,27 @@ export const StickyNote = memo(function StickyNote({ data, selected }) {
 });
 
 export const DecisionNode = memo(function DecisionNode({ data, selected }) {
+  const style = fillStyle(data.fillColor, {
+    background: '#ffffff',
+    color: '#0a0a0a',
+    borderColor: '#0a0a0a',
+  });
   return (
-    <div className="relative w-[170px] h-[100px] flex items-center justify-center">
+    <div
+      className={cn(
+        'relative w-[170px] h-[100px] flex items-center justify-center',
+        selected && 'outline-3 outline-offset-3 outline-[var(--color-danger)]',
+      )}
+    >
       <Handle type="target" position={Position.Top} className={HANDLE_CLASS} />
       <div
-        className={cn(
-          'absolute inset-0 rotate-45 scale-[0.71]',
-          'bg-white border-[2.5px] border-black',
-          selected && 'border-[var(--color-danger)] bg-[var(--color-danger-glow)]',
-        )}
+        style={{ background: style.background, borderColor: style.borderColor }}
+        className="absolute inset-0 rotate-45 scale-[0.71] border-[2.5px]"
       />
-      <span className="relative z-10 px-3 text-center font-display text-[13px] font-extrabold uppercase tracking-tight">
+      <span
+        style={{ color: style.color }}
+        className="relative z-10 px-3 text-center font-display text-[13px] font-extrabold uppercase tracking-tight"
+      >
         {data.label || 'Decizie?'}
       </span>
       <Handle type="source" position={Position.Left} id="no" className={HANDLE_CLASS} />
@@ -46,21 +71,19 @@ export const DecisionNode = memo(function DecisionNode({ data, selected }) {
 export const TerminalNode = memo(function TerminalNode({ data, selected }) {
   const variant = data.variant || 'start';
   const isEnd = variant === 'end';
+  const defaults = isEnd
+    ? { background: '#e11d3f', color: '#ffffff', borderColor: '#0a0a0a' }
+    : { background: '#ffffff', color: '#0a0a0a', borderColor: '#0a0a0a' };
+  const style = fillStyle(data.fillColor, defaults);
   return (
     <div
+      style={{ ...style, borderRadius: 999 }}
       className={cn(
         'min-w-[120px] px-6 py-2.5 text-center',
-        'border-[2.5px] border-black',
+        'border-[2.5px]',
         'font-display font-extrabold uppercase tracking-wider text-[12px]',
-        isEnd
-          ? 'bg-[var(--color-danger)] text-white'
-          : 'bg-white text-black',
-        selected && !isEnd && 'border-[var(--color-danger)] bg-[var(--color-danger-glow)]',
+        selected && 'outline-3 outline-offset-3 outline-[var(--color-danger)]',
       )}
-      style={{
-        clipPath: 'polygon(0 0, 100% 0, 100% 100%, 0 100%)',
-        borderRadius: 999,
-      }}
     >
       {variant !== 'start' && <Handle type="target" position={Position.Top} className={HANDLE_CLASS} />}
       {data.label}
