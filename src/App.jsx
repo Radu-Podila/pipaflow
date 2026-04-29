@@ -154,6 +154,7 @@ function FlowInner({ onBackToHero }) {
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [contextMenu, setContextMenu] = useState(null);
   const [nodeMenu, setNodeMenu] = useState(null);
+  const [edgeMenu, setEdgeMenu] = useState(null);
   const fileHandleRef = useRef(null);
   const [linkedFile, setLinkedFile] = useState(null);
   const legacyImportInputRef = useRef(null);
@@ -257,6 +258,7 @@ function FlowInner({ onBackToHero }) {
   const closeContextMenu = useCallback(() => {
     setContextMenu(null);
     setNodeMenu(null);
+    setEdgeMenu(null);
   }, []);
 
   const onNodeContextMenu = useCallback(
@@ -312,6 +314,88 @@ function FlowInner({ onBackToHero }) {
     setEdges((eds) =>
       eds.filter((e) => e.source !== nodeId && e.target !== nodeId),
     );
+  };
+
+  const onEdgeContextMenu = useCallback(
+    (e, edge) => {
+      e.preventDefault();
+      if (!wrapperRef.current) return;
+      const rect = wrapperRef.current.getBoundingClientRect();
+      const menuW = 220;
+      const menuH = 220;
+      const localX = e.clientX - rect.left;
+      const localY = e.clientY - rect.top;
+      setContextMenu(null);
+      setNodeMenu(null);
+      setEdgeMenu({
+        x: Math.min(localX, rect.width - menuW - 8),
+        y: Math.min(localY, rect.height - menuH - 8),
+        edgeId: edge.id,
+      });
+      // Selectează edge-ul ca să se vadă feedback-ul
+      setEdges((eds) =>
+        eds.map((ed) => ({ ...ed, selected: ed.id === edge.id })),
+      );
+    },
+    [],
+  );
+
+  const setEdgeStyle = (edgeId, kind) => {
+    snapshot();
+    setEdges((eds) =>
+      eds.map((e) => {
+        if (e.id !== edgeId) return e;
+        const baseStyle = { strokeWidth: 2.5, stroke: '#0a0a0a' };
+        if (kind === 'solid') {
+          const { strokeDasharray, ...rest } = e.style || {};
+          return { ...e, animated: false, style: { ...baseStyle, ...rest } };
+        }
+        if (kind === 'dashed') {
+          return {
+            ...e,
+            animated: false,
+            style: { ...baseStyle, ...(e.style || {}), strokeDasharray: '8 4' },
+          };
+        }
+        if (kind === 'dotted') {
+          return {
+            ...e,
+            animated: false,
+            style: { ...baseStyle, ...(e.style || {}), strokeDasharray: '2 4' },
+          };
+        }
+        if (kind === 'animated') {
+          return {
+            ...e,
+            animated: true,
+            style: { ...baseStyle, ...(e.style || {}) },
+          };
+        }
+        return e;
+      }),
+    );
+  };
+
+  const reverseEdge = (edgeId) => {
+    snapshot();
+    setEdges((eds) =>
+      eds.map((e) =>
+        e.id === edgeId
+          ? {
+              ...e,
+              source: e.target,
+              target: e.source,
+              sourceHandle: e.targetHandle ?? null,
+              targetHandle: e.sourceHandle ?? null,
+            }
+          : e,
+      ),
+    );
+  };
+
+  const deleteEdgeById = (edgeId) => {
+    snapshot();
+    setEdges((eds) => eds.filter((e) => e.id !== edgeId));
   };
 
   const duplicateNodeById = (nodeId) => {
@@ -803,6 +887,7 @@ function FlowInner({ onBackToHero }) {
           onNodeDragStart={snapshot}
           onPaneContextMenu={onPaneContextMenu}
           onNodeContextMenu={onNodeContextMenu}
+          onEdgeContextMenu={onEdgeContextMenu}
           onPaneClick={closeContextMenu}
           onMoveStart={closeContextMenu}
           defaultEdgeOptions={{
@@ -973,12 +1058,108 @@ function FlowInner({ onBackToHero }) {
             </button>
           </div>
         )}
+
+        {/* Edge context menu (right-click pe săgeată) */}
+        {edgeMenu && (() => {
+          const ed = edges.find((e) => e.id === edgeMenu.edgeId);
+          if (!ed) return null;
+          const dashArr = ed.style?.strokeDasharray;
+          const isAnimated = !!ed.animated;
+          const isDashed = !isAnimated && dashArr === '8 4';
+          const isDotted = !isAnimated && dashArr === '2 4';
+          const isSolid = !isAnimated && !dashArr;
+
+          const StyleBtn = ({ active, label, onClick, preview }) => (
+            <button
+              onClick={onClick}
+              className={cn(
+                'flex w-full items-center gap-3 px-3 py-2 text-left font-bold text-[12px] uppercase tracking-wider',
+                active
+                  ? 'bg-[var(--color-danger)] text-white'
+                  : 'hover:bg-[var(--color-fg)] hover:text-white',
+              )}
+            >
+              <span className="inline-block h-[18px] w-[40px] flex-shrink-0 border-y-2 border-black/0">
+                <svg width="40" height="18" viewBox="0 0 40 18">
+                  {preview}
+                </svg>
+              </span>
+              {label}
+              {active && <span className="ml-auto font-mono text-[10px]">●</span>}
+            </button>
+          );
+
+          return (
+            <div
+              className="absolute z-[90] w-[240px] border-[2.5px] border-black bg-white p-1 shadow-[6px_6px_0_0_#000]"
+              style={{ left: edgeMenu.x, top: edgeMenu.y }}
+              onContextMenu={(e) => e.preventDefault()}
+            >
+              <div className="border-b-2 border-black bg-black px-3 py-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.25em] text-white">
+                Săgeată · Stil
+              </div>
+
+              <StyleBtn
+                active={isSolid}
+                label="Linie continuă"
+                onClick={() => { setEdgeStyle(edgeMenu.edgeId, 'solid'); setEdgeMenu(null); }}
+                preview={<line x1="2" y1="9" x2="38" y2="9" stroke="currentColor" strokeWidth="2.5" />}
+              />
+              <StyleBtn
+                active={isDashed}
+                label="Punctată"
+                onClick={() => { setEdgeStyle(edgeMenu.edgeId, 'dashed'); setEdgeMenu(null); }}
+                preview={<line x1="2" y1="9" x2="38" y2="9" stroke="currentColor" strokeWidth="2.5" strokeDasharray="6 3" />}
+              />
+              <StyleBtn
+                active={isDotted}
+                label="Puncte mici"
+                onClick={() => { setEdgeStyle(edgeMenu.edgeId, 'dotted'); setEdgeMenu(null); }}
+                preview={<line x1="2" y1="9" x2="38" y2="9" stroke="currentColor" strokeWidth="2.5" strokeDasharray="2 3" strokeLinecap="round" />}
+              />
+              <StyleBtn
+                active={isAnimated}
+                label="Animată"
+                onClick={() => { setEdgeStyle(edgeMenu.edgeId, 'animated'); setEdgeMenu(null); }}
+                preview={
+                  <line
+                    x1="2" y1="9" x2="38" y2="9"
+                    stroke="currentColor" strokeWidth="2.5"
+                    strokeDasharray="5 3"
+                  >
+                    <animate attributeName="stroke-dashoffset" from="0" to="-16" dur="0.8s" repeatCount="indefinite" />
+                  </line>
+                }
+              />
+
+              <div className="my-1 h-[2px] bg-black" />
+
+              <button
+                onClick={() => { reverseEdge(edgeMenu.edgeId); setEdgeMenu(null); }}
+                className="flex w-full items-center gap-3 px-3 py-2 text-left font-bold text-[12px] uppercase tracking-wider hover:bg-[var(--color-fg)] hover:text-white"
+              >
+                <span className="font-mono text-[14px] leading-none">⇄</span>
+                Inversează direcția
+              </button>
+
+              <div className="my-1 h-[2px] bg-black" />
+
+              <button
+                onClick={() => { deleteEdgeById(edgeMenu.edgeId); setEdgeMenu(null); }}
+                className="flex w-full items-center gap-3 px-3 py-2 text-left font-bold text-[12px] uppercase tracking-wider text-[var(--color-danger)] hover:bg-[var(--color-danger)] hover:text-white"
+              >
+                <Trash2 className="h-3.5 w-3.5" strokeWidth={2.5} />
+                Șterge
+              </button>
+            </div>
+          );
+        })()}
       </div>
 
       {/* ───── Status bar ───── */}
       <footer className="flex flex-wrap items-center justify-between gap-3 border-t-[3px] border-black bg-black px-4 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-white">
         <span className="text-white/80">
-          drag = select · <span className="text-[var(--color-danger)]">space</span>+drag = pan · right-click = meniu · ctrl+c/v = copy/paste · ctrl+d = duplică · ctrl+z = undo · 2× click pe edge = șterge
+          drag = select · <span className="text-[var(--color-danger)]">space</span>+drag = pan · right-click = meniu (canvas/bulă/<span className="text-[var(--color-danger)]">săgeată</span>) · ctrl+c/v = copy/paste · ctrl+d = duplică · ctrl+z = undo · 2× click pe edge = șterge
         </span>
         <span className="text-white/40">
           {nodes.length} noduri · {edges.length} edges
