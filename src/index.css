@@ -1,21 +1,37 @@
-:root {
-  --bg: #fafafa;
-  --bg-card: #ffffff;
-  --bg-muted: #f1f3f5;
-  --text: #1a1a1a;
-  --text-muted: #6b7280;
-  --border: #e5e7eb;
-  --border-light: #f1f3f5;
-  --accent: #2f6feb;
-  --accent-bg: #e7f0ff;
-  --danger: #ef4444;
-  --danger-bg: rgba(239, 68, 68, 0.08);
-  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.12);
-  --radius: 10px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  font-size: 14px;
-  color: var(--text);
-  background: var(--bg);
+@import 'tailwindcss';
+
+/*
+  ─────────────────────────────────────────────────────────────
+  PIPAFLOW — Neobrutalist red/white/black
+  60% white (background, panels)
+  30% black (text, borders, structure)
+  10% red  (CTA, selected, danger, accent)
+  ─────────────────────────────────────────────────────────────
+*/
+
+@theme {
+  --color-bg:      #ffffff;
+  --color-card:    #fafafa;
+  --color-muted:   #f0f0f0;
+  --color-fg:      #0a0a0a;
+  --color-fg-soft: #404040;
+  --color-fg-mute: #737373;
+  --color-line:    #0a0a0a;
+  --color-line-soft: #d4d4d4;
+
+  --color-danger:  #e11d3f;
+  --color-danger-deep: #b8102e;
+  --color-danger-glow: #fff0f3;
+
+  --shadow-brut: 4px 4px 0 0 var(--color-line);
+  --shadow-brut-sm: 2px 2px 0 0 var(--color-line);
+  --shadow-brut-lg: 8px 8px 0 0 var(--color-line);
+  --shadow-danger: 4px 4px 0 0 var(--color-danger-deep);
+
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Space Grotesk', 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  --font-hand: 'Caveat', 'Comic Sans MS', cursive;
 }
 
 * { box-sizing: border-box; }
@@ -27,4 +43,130 @@ html, body, #root {
   width: 100%;
 }
 
+html {
+  font-family: var(--font-sans);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-size: 14px;
+  font-feature-settings: 'cv11', 'ss01', 'ss03';
+}
+
 button { font-family: inherit; }
+
+::selection {
+  background: var(--color-danger);
+  color: white;
+}
+
+/* ────────── React Flow overrides ────────── */
+.react-flow__node {
+  font-family: var(--font-sans);
+  font-size: 13px !important;
+  line-height: 1.4 !important;
+  font-weight: 600;
+}
+
+.react-flow__node-default {
+  white-space: pre-line !important;
+  text-align: center;
+  color: var(--color-fg) !important;
+  background: var(--color-bg) !important;
+  border: 2.5px solid var(--color-line) !important;
+  border-radius: 0 !important;
+  padding: 12px 16px !important;
+  box-shadow: var(--shadow-brut-sm);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.react-flow__node-default.selected {
+  background: var(--color-danger-glow) !important;
+  border-color: var(--color-danger) !important;
+  box-shadow: var(--shadow-danger);
+}
+
+.react-flow__handle {
+  width: 10px !important;
+  height: 10px !important;
+  background: var(--color-line) !important;
+  border: 2px solid var(--color-bg) !important;
+  border-radius: 0 !important;
+}
+.react-flow__handle:hover {
+  background: var(--color-danger) !important;
+}
+
+.react-flow__edge-path {
+  stroke-width: 2.5;
+  stroke: var(--color-line);
+}
+
+.react-flow__edge { cursor: pointer; }
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke: var(--color-danger);
+  stroke-width: 3.5;
+}
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: var(--color-danger) !important;
+  stroke-width: 3.5 !important;
+  stroke-dasharray: 8 4;
+  animation: pf-march 0.8s linear infinite;
+}
+
+@keyframes pf-march {
+  to { stroke-dashoffset: -24; }
+}
+
+.react-flow__edge-text {
+  font-size: 11px;
+  font-weight: 700;
+  fill: var(--color-fg);
+  font-family: var(--font-mono);
+}
+
+.react-flow__connection-path {
+  stroke: var(--color-danger);
+  stroke-width: 2.5;
+  stroke-dasharray: 6 4;
+}
+
+.react-flow__controls {
+  border: 2.5px solid var(--color-line) !important;
+  box-shadow: var(--shadow-brut-sm);
+  border-radius: 0 !important;
+  overflow: hidden;
+}
+.react-flow__controls-button {
+  background: var(--color-bg) !important;
+  border-bottom: 1.5px solid var(--color-line) !important;
+  border-radius: 0 !important;
+  width: 28px !important;
+  height: 28px !important;
+}
+.react-flow__controls-button:hover {
+  background: var(--color-fg) !important;
+  color: white !important;
+}
+.react-flow__controls-button svg { fill: currentColor; }
+
+.react-flow__minimap {
+  border: 2.5px solid var(--color-line);
+  border-radius: 0 !important;
+  background: var(--color-bg) !important;
+}
+
+.react-flow__background {
+  background: var(--color-bg);
+}
+
+.react-flow__selection {
+  background: rgba(225, 29, 63, 0.08);
+  border: 1.5px dashed var(--color-danger);
+}
+
+.react-flow__attribution {
+  background: transparent !important;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  opacity: 0.4;
+}

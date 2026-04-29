@@ -12,35 +12,53 @@ import {
   useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import {
+  ArrowLeft,
+  ArrowDown,
+  ArrowRight as ArrowRightIcon,
+  Download,
+  FileJson,
+  FilePlus2,
+  FolderOpen,
+  Image as ImageIcon,
+  Plus,
+  Redo2,
+  Save,
+  SaveAll,
+  Trash2,
+  Undo2,
+  X,
+} from 'lucide-react';
 
-import Hero from './components/Hero.jsx';
-import { nodeTypes } from './components/nodes.jsx';
-import { layoutDagre } from './lib/layout.js';
-import { exportPng, exportSvg } from './lib/exportImage.js';
+import Hero from '@/components/Hero.jsx';
+import { nodeTypes } from '@/components/nodes.jsx';
+import { Button } from '@/components/ui/button.jsx';
+import { Input } from '@/components/ui/input.jsx';
+import { cn } from '@/lib/utils.js';
+import { layoutDagre } from '@/lib/layout.js';
+import { exportPng, exportSvg } from '@/lib/exportImage.js';
 import {
   loadCurrent,
   loadList,
   loadFlow,
   saveFlow,
   deleteFlow,
-} from './lib/storage.js';
+} from '@/lib/storage.js';
 import {
   supportsFsAccess,
   openJsonFile,
   writeJsonToHandle,
   saveAsJsonFile,
-} from './lib/fsAccess.js';
-
-import './App.css';
+} from '@/lib/fsAccess.js';
 
 const HISTORY_LIMIT = 50;
 
 const PALETTE = [
-  { key: 'start', kind: 'terminal', variant: 'start', label: 'Start', bg: '#b2f2bb', border: '#2f9e44' },
-  { key: 'action', kind: 'default', label: 'Acțiune', bg: '#a5d8ff', border: '#1971c2' },
-  { key: 'decision', kind: 'decision', label: 'Decizie?', bg: '#ffec99', border: '#f59f00' },
-  { key: 'end', kind: 'terminal', variant: 'end', label: 'Final', bg: '#ffc9c9', border: '#e03131' },
-  { key: 'note', kind: 'sticky', label: 'Notă liberă', bg: '#fff3bf', border: '#fab005' },
+  { key: 'start',    kind: 'terminal', variant: 'start', label: 'Start',    dot: '#0a0a0a', sample: 'pill-w' },
+  { key: 'action',   kind: 'default',                    label: 'Acțiune',  dot: '#0a0a0a', sample: 'box-w'  },
+  { key: 'decision', kind: 'decision',                   label: 'Decizie?', dot: '#0a0a0a', sample: 'diamond' },
+  { key: 'end',      kind: 'terminal', variant: 'end',   label: 'Final',    dot: '#e11d3f', sample: 'pill-r' },
+  { key: 'note',     kind: 'sticky',                     label: 'Notă',     dot: '#fbbf24', sample: 'note'   },
 ];
 
 const initialNodes = [
@@ -59,20 +77,10 @@ function makeId(prefix = 'n') {
 function buildNode(preset, position) {
   const id = makeId();
   if (preset.kind === 'sticky') {
-    return {
-      id,
-      type: 'sticky',
-      data: { label: preset.label },
-      position,
-    };
+    return { id, type: 'sticky', data: { label: preset.label }, position };
   }
   if (preset.kind === 'decision') {
-    return {
-      id,
-      type: 'decision',
-      data: { label: preset.label },
-      position,
-    };
+    return { id, type: 'decision', data: { label: preset.label }, position };
   }
   if (preset.kind === 'terminal') {
     return {
@@ -82,21 +90,18 @@ function buildNode(preset, position) {
       position,
     };
   }
-  return {
-    id,
-    type: 'default',
-    data: { label: preset.label },
-    position,
-    style: {
-      background: preset.bg,
-      border: `2px solid ${preset.border}`,
-      borderRadius: 12,
-      padding: 10,
-      fontWeight: 600,
-      minWidth: 140,
-      textAlign: 'center',
-    },
-  };
+  return { id, type: 'default', data: { label: preset.label }, position };
+}
+
+function PaletteSample({ kind }) {
+  const base = 'inline-block border-[2px] border-black';
+  if (kind === 'pill-w') return <span className={cn(base, 'h-3 w-5 rounded-full bg-white')} />;
+  if (kind === 'pill-r') return <span className={cn(base, 'h-3 w-5 rounded-full bg-[var(--color-danger)]')} />;
+  if (kind === 'box-w') return <span className={cn(base, 'h-3 w-3 bg-white')} />;
+  if (kind === 'diamond')
+    return <span className={cn(base, 'h-3 w-3 rotate-45 bg-white')} />;
+  if (kind === 'note') return <span className={cn(base, 'h-3 w-3 bg-[#fff8c5] -rotate-6')} />;
+  return null;
 }
 
 function FlowInner({ onBackToHero }) {
@@ -155,7 +160,7 @@ function FlowInner({ onBackToHero }) {
           {
             ...params,
             animated: false,
-            style: { strokeWidth: 2, stroke: '#495057' },
+            style: { strokeWidth: 2.5, stroke: '#0a0a0a' },
             interactionWidth: 24,
           },
           eds,
@@ -165,10 +170,13 @@ function FlowInner({ onBackToHero }) {
     [snapshot],
   );
 
-  const onEdgeDoubleClick = useCallback((_, edge) => {
-    snapshot();
-    setEdges((eds) => eds.filter((e) => e.id !== edge.id));
-  }, [snapshot]);
+  const onEdgeDoubleClick = useCallback(
+    (_, edge) => {
+      snapshot();
+      setEdges((eds) => eds.filter((e) => e.id !== edge.id));
+    },
+    [snapshot],
+  );
 
   const addNode = (preset, atFlowPos = null) => {
     snapshot();
@@ -190,21 +198,24 @@ function FlowInner({ onBackToHero }) {
     setNodes((nds) => [...nds, buildNode(preset, position)]);
   };
 
-  const onPaneContextMenu = useCallback((e) => {
-    e.preventDefault();
-    if (!wrapperRef.current) return;
-    const rect = wrapperRef.current.getBoundingClientRect();
-    const flowPos = rf.screenToFlowPosition({ x: e.clientX, y: e.clientY });
-    const menuW = 200;
-    const menuH = 240;
-    const localX = e.clientX - rect.left;
-    const localY = e.clientY - rect.top;
-    setContextMenu({
-      x: Math.min(localX, rect.width - menuW - 8),
-      y: Math.min(localY, rect.height - menuH - 8),
-      flowPos,
-    });
-  }, [rf]);
+  const onPaneContextMenu = useCallback(
+    (e) => {
+      e.preventDefault();
+      if (!wrapperRef.current) return;
+      const rect = wrapperRef.current.getBoundingClientRect();
+      const flowPos = rf.screenToFlowPosition({ x: e.clientX, y: e.clientY });
+      const menuW = 220;
+      const menuH = 280;
+      const localX = e.clientX - rect.left;
+      const localY = e.clientY - rect.top;
+      setContextMenu({
+        x: Math.min(localX, rect.width - menuW - 8),
+        y: Math.min(localY, rect.height - menuH - 8),
+        flowPos,
+      });
+    },
+    [rf],
+  );
 
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
 
@@ -295,6 +306,11 @@ function FlowInner({ onBackToHero }) {
     };
   }, [editingNodeId]);
 
+  const detachFile = () => {
+    fileHandleRef.current = null;
+    setLinkedFile(null);
+  };
+
   const handleSave = async () => {
     const list = saveFlow(currentName, nodes, edges);
     setSavedFlows(list);
@@ -352,11 +368,6 @@ function FlowInner({ onBackToHero }) {
     }
   };
 
-  const detachFile = () => {
-    fileHandleRef.current = null;
-    setLinkedFile(null);
-  };
-
   const handleLoad = (id) => {
     const data = loadFlow(id);
     if (!data) return;
@@ -403,11 +414,9 @@ function FlowInner({ onBackToHero }) {
         if (parsed.nodes) setNodes(parsed.nodes);
         if (parsed.edges) setEdges(parsed.edges);
         if (parsed.name) setCurrentName(parsed.name);
-        // Browser-ul nu suportă File System Access — nu putem scrie înapoi.
         detachFile();
         if (!supportsFsAccess) {
-          // Notă discretă: arătăm filename-ul ca read-only marker
-          setLinkedFile(`${file.name} (read-only — browser-ul tău nu suportă scrierea)`);
+          setLinkedFile(`${file.name} (read-only)`);
         }
       } catch (err) {
         alert('JSON invalid: ' + err.message);
@@ -430,72 +439,93 @@ function FlowInner({ onBackToHero }) {
 
   const nodeTypesMemo = useMemo(() => nodeTypes, []);
 
-  return (
-    <div className="pf-editor">
-      <header className="pf-toolbar">
-        <button className="pf-btn pf-btn--ghost" onClick={onBackToHero} title="Înapoi la pagina principală">
-          ← Acasă
-        </button>
+  // ─── Toolbar group divider ───
+  const Divider = () => <span className="mx-1 hidden h-6 w-[2px] bg-black/20 sm:inline-block" />;
 
-        <input
-          className="pf-name-input"
+  return (
+    <div className="flex h-screen w-full flex-col bg-white text-[var(--color-fg)]">
+      {/* ───── Top bar ───── */}
+      <header className="flex flex-wrap items-center gap-2 border-b-[3px] border-black bg-white px-4 py-3">
+        <Button variant="ghost" size="sm" onClick={onBackToHero}>
+          <ArrowLeft className="h-3.5 w-3.5" /> Acasă
+        </Button>
+
+        <Divider />
+
+        <Input
           value={currentName}
           onChange={(e) => setCurrentName(e.target.value)}
           placeholder="Numele flowului"
+          className="w-44 sm:w-56"
         />
 
         {linkedFile && (
-          <span className="pf-file-chip" title="Fișier legat — Salvează scrie aici">
-            📎 {linkedFile}
+          <span
+            title="Fișier legat — Salvează scrie aici"
+            className="inline-flex h-9 max-w-[280px] items-center gap-1.5 truncate border-[2.5px] border-[var(--color-danger)] bg-[var(--color-danger-glow)] px-2.5 py-0 font-mono text-[10px] font-bold uppercase tracking-wider text-[var(--color-danger-deep)] shadow-[2px_2px_0_0_var(--color-danger-deep)]"
+          >
+            ⌁ {linkedFile}
             <button
-              className="pf-file-chip__close"
               onClick={detachFile}
+              className="ml-1 inline-flex h-4 w-4 items-center justify-center hover:bg-[var(--color-danger)] hover:text-white"
               title="Detașează"
             >
-              ×
+              <X className="h-3 w-3" strokeWidth={3} />
             </button>
           </span>
         )}
 
-        <div className="pf-toolbar__group">
-          <button className="pf-btn" onClick={handleNew}>📄 Nou</button>
-          <button
-            className="pf-btn"
-            onClick={handleSave}
-            title={fileHandleRef.current ? `Salvează în ${linkedFile} + localStorage` : 'Salvează în localStorage'}
-          >
-            💾 Salvează
-          </button>
-        </div>
+        <Divider />
 
-        <div className="pf-toolbar__group">
-          <button className="pf-btn" disabled={!canUndo} onClick={undo} title="Undo (Ctrl+Z)">↶</button>
-          <button className="pf-btn" disabled={!canRedo} onClick={redo} title="Redo (Ctrl+Shift+Z)">↷</button>
-        </div>
+        <Button onClick={handleNew} title="Flow nou">
+          <FilePlus2 className="h-3.5 w-3.5" /> Nou
+        </Button>
+        <Button
+          variant="primary"
+          onClick={handleSave}
+          title={fileHandleRef.current ? `Salvează în ${linkedFile} + localStorage` : 'Salvează în localStorage'}
+        >
+          <Save className="h-3.5 w-3.5" /> Salvează
+        </Button>
 
-        <div className="pf-toolbar__group">
-          <button className="pf-btn" onClick={() => autoLayout('TB')} title="Aranjează vertical">
-            ⬇ Aranjează
-          </button>
-          <button className="pf-btn" onClick={() => autoLayout('LR')} title="Aranjează orizontal">
-            ➡ Orizontal
-          </button>
-        </div>
+        <Divider />
 
-        <div className="pf-toolbar__group">
-          <button className="pf-btn" onClick={openFile} title="Deschide JSON din disk (sync bidirecțional unde e suportat)">
-            📂 Deschide
-          </button>
-          <button className="pf-btn" onClick={saveAs} title="Salvează ca fișier nou pe disk">
-            💾 Salvează ca…
-          </button>
-        </div>
+        <Button size="icon" onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)">
+          <Undo2 className="h-4 w-4" />
+        </Button>
+        <Button size="icon" onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Shift+Z)">
+          <Redo2 className="h-4 w-4" />
+        </Button>
 
-        <div className="pf-toolbar__group">
-          <button className="pf-btn" onClick={exportJson}>⬇ JSON</button>
-          <button className="pf-btn" onClick={() => exportPng(currentName, nodes)}>⬇ PNG</button>
-          <button className="pf-btn" onClick={() => exportSvg(currentName, nodes)}>⬇ SVG</button>
-        </div>
+        <Divider />
+
+        <Button onClick={() => autoLayout('TB')} title="Aranjează vertical">
+          <ArrowDown className="h-3.5 w-3.5" /> Aranjează
+        </Button>
+        <Button onClick={() => autoLayout('LR')} title="Aranjează orizontal">
+          <ArrowRightIcon className="h-3.5 w-3.5" /> Orizontal
+        </Button>
+
+        <Divider />
+
+        <Button onClick={openFile} title="Deschide JSON din disk">
+          <FolderOpen className="h-3.5 w-3.5" /> Deschide
+        </Button>
+        <Button onClick={saveAs} title="Salvează ca fișier nou pe disk">
+          <SaveAll className="h-3.5 w-3.5" /> Save as
+        </Button>
+
+        <Divider />
+
+        <Button onClick={exportJson} size="icon" title="Export JSON">
+          <FileJson className="h-4 w-4" />
+        </Button>
+        <Button onClick={() => exportPng(currentName, nodes)} size="icon" title="Export PNG">
+          <ImageIcon className="h-4 w-4" />
+        </Button>
+        <Button onClick={() => exportSvg(currentName, nodes)} size="icon" title="Export SVG">
+          <Download className="h-4 w-4" />
+        </Button>
 
         <input
           ref={legacyImportInputRef}
@@ -505,42 +535,72 @@ function FlowInner({ onBackToHero }) {
           hidden
         />
 
-        <div className="pf-toolbar__spacer" />
+        <span className="ml-auto" />
 
-        <button className="pf-btn pf-btn--danger" onClick={deleteSelected} title="Șterge selecția (Delete)">
-          🗑 Șterge
-        </button>
+        <Button variant="danger" onClick={deleteSelected} title="Șterge selecția (Delete)">
+          <Trash2 className="h-3.5 w-3.5" /> Șterge
+        </Button>
       </header>
 
-      <section className="pf-palette">
-        <span className="pf-palette__label">Adaugă:</span>
+      {/* ───── Palette ───── */}
+      <section className="flex flex-wrap items-center gap-2 border-b-[2.5px] border-black bg-[var(--color-card)] px-4 py-2">
+        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[var(--color-fg-soft)]">
+          Adaugă →
+        </span>
         {PALETTE.map((p) => (
           <button
             key={p.key}
-            className="pf-palette__btn"
-            style={{ background: p.bg, borderColor: p.border }}
             onClick={() => addNode(p)}
+            className={cn(
+              'inline-flex items-center gap-2 h-8 px-3',
+              'border-[2.5px] border-black bg-white',
+              'font-bold text-[11px] uppercase tracking-wider',
+              'shadow-[2px_2px_0_0_#000]',
+              'hover:-translate-x-[1px] hover:-translate-y-[1px] hover:shadow-[3px_3px_0_0_#000]',
+              'hover:bg-[var(--color-danger)] hover:text-white hover:border-black',
+              'active:translate-x-0 active:translate-y-0 active:shadow-[1px_1px_0_0_#000]',
+              'transition-[transform,box-shadow,background] duration-100',
+            )}
           >
-            + {p.label}
+            <PaletteSample kind={p.sample} />
+            {p.label}
           </button>
         ))}
       </section>
 
+      {/* ───── Saved flows ───── */}
       {savedFlows.length > 0 && (
-        <section className="pf-saved">
-          <span className="pf-saved__label">Salvate:</span>
+        <section className="flex flex-wrap items-center gap-2 border-b-[2.5px] border-black bg-white px-4 py-2">
+          <span className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[var(--color-fg-soft)]">
+            Salvate ↘
+          </span>
           {savedFlows.map((f) => (
-            <button key={f.id} className="pf-saved__item" onClick={() => handleLoad(f.id)}>
+            <button
+              key={f.id}
+              onClick={() => handleLoad(f.id)}
+              className="group inline-flex h-7 items-center gap-2 border-[2px] border-black bg-white pr-1 pl-3 font-mono text-[11px] font-bold uppercase tracking-wider hover:bg-black hover:text-white"
+            >
               {f.name}
-              <span className="pf-saved__close" onClick={(e) => handleDelete(f.id, e)}>×</span>
+              <span
+                onClick={(e) => handleDelete(f.id, e)}
+                className="inline-flex h-5 w-5 items-center justify-center hover:bg-[var(--color-danger)] hover:text-white group-hover:text-white"
+              >
+                ×
+              </span>
             </button>
           ))}
         </section>
       )}
 
+      {/* ───── Canvas ───── */}
       <div
-        className={`pf-canvas${spaceHeld ? ' pf-canvas--pan' : ''}`}
         ref={wrapperRef}
+        className={cn(
+          'relative flex-1 min-h-0',
+          spaceHeld
+            ? '[&_.react-flow__pane]:!cursor-grab [&_.react-flow__pane:active]:!cursor-grabbing'
+            : '[&_.react-flow__pane]:!cursor-crosshair',
+        )}
       >
         <ReactFlow
           nodes={nodes}
@@ -556,7 +616,7 @@ function FlowInner({ onBackToHero }) {
           onPaneClick={closeContextMenu}
           onMoveStart={closeContextMenu}
           defaultEdgeOptions={{
-            style: { strokeWidth: 2, stroke: '#495057' },
+            style: { strokeWidth: 2.5, stroke: '#0a0a0a' },
             interactionWidth: 24,
           }}
           fitView
@@ -567,57 +627,87 @@ function FlowInner({ onBackToHero }) {
           selectionOnDrag={!spaceHeld}
           selectionMode={SelectionMode.Partial}
         >
-          <Background gap={20} size={1} />
+          <Background gap={24} size={1.5} color="#0a0a0a" style={{ opacity: 0.08 }} />
           <Controls />
-          <MiniMap pannable zoomable />
+          <MiniMap pannable zoomable maskColor="rgba(10,10,10,0.85)" />
         </ReactFlow>
 
+        {/* Edit text modal */}
         {editingNode && (
-          <div className="pf-edit-overlay" onClick={() => setEditingNodeId(null)}>
-            <div className="pf-edit-modal" onClick={(e) => e.stopPropagation()}>
-              <label>Text bulă</label>
-              <textarea
-                autoFocus
-                rows={3}
-                value={editingNode.data.label || ''}
-                onChange={(e) => updateNodeLabel(editingNode.id, e.target.value)}
-              />
-              <button className="pf-btn pf-btn--primary" onClick={() => setEditingNodeId(null)}>
-                Gata
-              </button>
+          <div
+            className="absolute inset-0 z-[100] flex items-center justify-center bg-black/50"
+            onClick={() => setEditingNodeId(null)}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="w-[420px] max-w-[90vw] border-[3px] border-black bg-white shadow-[8px_8px_0_0_#000]"
+            >
+              <div className="flex items-center justify-between border-b-[2.5px] border-black bg-[var(--color-danger)] px-4 py-2 text-white">
+                <span className="font-mono text-[10px] font-bold uppercase tracking-[0.25em]">
+                  ▲ Editează text
+                </span>
+                <button
+                  onClick={() => setEditingNodeId(null)}
+                  className="hover:opacity-70"
+                  title="Închide (Esc)"
+                >
+                  <X className="h-4 w-4" strokeWidth={3} />
+                </button>
+              </div>
+              <div className="flex flex-col gap-3 p-4">
+                <textarea
+                  autoFocus
+                  rows={4}
+                  value={editingNode.data.label || ''}
+                  onChange={(e) => updateNodeLabel(editingNode.id, e.target.value)}
+                  className="w-full border-[2.5px] border-black bg-white p-3 font-sans text-sm font-medium shadow-[3px_3px_0_0_#000] focus:border-[var(--color-danger)] focus:shadow-[3px_3px_0_0_var(--color-danger-deep)] focus:outline-none"
+                />
+                <div className="flex justify-end">
+                  <Button variant="primary" onClick={() => setEditingNodeId(null)}>
+                    Gata
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         )}
 
+        {/* Context menu */}
         {contextMenu && (
           <div
-            className="pf-ctx-menu"
+            className="absolute z-[90] w-[220px] border-[2.5px] border-black bg-white p-1 shadow-[6px_6px_0_0_#000]"
             style={{ left: contextMenu.x, top: contextMenu.y }}
             onContextMenu={(e) => e.preventDefault()}
           >
-            <div className="pf-ctx-menu__title">Adaugă bulă aici</div>
+            <div className="border-b-2 border-black bg-black px-3 py-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.25em] text-white">
+              Adaugă bulă aici
+            </div>
             {PALETTE.map((p) => (
               <button
                 key={p.key}
-                className="pf-ctx-menu__item"
                 onClick={() => {
                   addNode(p, contextMenu.flowPos);
                   setContextMenu(null);
                 }}
+                className="group flex w-full items-center gap-3 px-3 py-2 text-left font-bold text-[12px] uppercase tracking-wider hover:bg-[var(--color-danger)] hover:text-white"
               >
-                <span
-                  className="pf-ctx-menu__chip"
-                  style={{ background: p.bg, borderColor: p.border }}
-                />
+                <PaletteSample kind={p.sample} />
                 {p.label}
+                <Plus className="ml-auto h-3 w-3 opacity-0 group-hover:opacity-100" strokeWidth={3} />
               </button>
             ))}
           </div>
         )}
       </div>
 
-      <footer className="pf-help">
-        💡 <strong>Cum folosești:</strong> drag pe canvas = <strong>selecție multiplă</strong> · <strong>Space + drag = pan (mănușă)</strong> · <strong>click dreapta = meniu „adaugă aici"</strong> · trage de la punctul unei bule ca s-o conectezi · dublu-click pe bulă schimbă textul · dublu-click pe săgeată o șterge · Delete șterge selecția · Ctrl+Z undo
+      {/* ───── Status bar ───── */}
+      <footer className="flex flex-wrap items-center justify-between gap-3 border-t-[3px] border-black bg-black px-4 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-white">
+        <span className="text-white/80">
+          drag = select · <span className="text-[var(--color-danger)]">space</span>+drag = pan · right-click = adaugă · 2× click pe edge = șterge · ctrl+z = undo
+        </span>
+        <span className="text-white/40">
+          {nodes.length} noduri · {edges.length} edges
+        </span>
       </footer>
     </div>
   );
