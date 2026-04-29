@@ -24,6 +24,12 @@ import {
   saveFlow,
   deleteFlow,
 } from './lib/storage.js';
+import {
+  supportsFsAccess,
+  openJsonFile,
+  writeJsonToHandle,
+  saveAsJsonFile,
+} from './lib/fsAccess.js';
 
 import './App.css';
 
@@ -108,6 +114,9 @@ function FlowInner({ onBackToHero }) {
   const bumpUi = () => forceTick((t) => t + 1);
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [contextMenu, setContextMenu] = useState(null);
+  const fileHandleRef = useRef(null);
+  const [linkedFile, setLinkedFile] = useState(null);
+  const legacyImportInputRef = useRef(null);
 
   const snapshot = useCallback(() => {
     past.current.push({
@@ -286,9 +295,66 @@ function FlowInner({ onBackToHero }) {
     };
   }, [editingNodeId]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const list = saveFlow(currentName, nodes, edges);
     setSavedFlows(list);
+    if (fileHandleRef.current) {
+      try {
+        await writeJsonToHandle(fileHandleRef.current, {
+          name: currentName,
+          nodes,
+          edges,
+        });
+      } catch (err) {
+        alert('Nu am putut scrie în fișier: ' + err.message);
+      }
+    }
+  };
+
+  const openFile = async () => {
+    if (!supportsFsAccess) {
+      legacyImportInputRef.current?.click();
+      return;
+    }
+    try {
+      const result = await openJsonFile();
+      if (!result) return;
+      const parsed = JSON.parse(result.text);
+      snapshot();
+      if (parsed.nodes) setNodes(parsed.nodes);
+      if (parsed.edges) setEdges(parsed.edges);
+      if (parsed.name) setCurrentName(parsed.name);
+      fileHandleRef.current = result.handle;
+      setLinkedFile(result.name);
+    } catch (err) {
+      alert('Nu am putut deschide fișierul: ' + err.message);
+    }
+  };
+
+  const saveAs = async () => {
+    if (!supportsFsAccess) {
+      exportJson();
+      return;
+    }
+    try {
+      const result = await saveAsJsonFile(`${currentName || 'flow'}.json`, {
+        name: currentName,
+        nodes,
+        edges,
+      });
+      if (!result) return;
+      fileHandleRef.current = result.handle;
+      setLinkedFile(result.name);
+      const list = saveFlow(currentName, nodes, edges);
+      setSavedFlows(list);
+    } catch (err) {
+      alert('Nu am putut salva: ' + err.message);
+    }
+  };
+
+  const detachFile = () => {
+    fileHandleRef.current = null;
+    setLinkedFile(null);
   };
 
   const handleLoad = (id) => {
@@ -298,6 +364,7 @@ function FlowInner({ onBackToHero }) {
     setNodes(data.nodes || []);
     setEdges(data.edges || []);
     setCurrentName(data.name || id);
+    detachFile();
   };
 
   const handleDelete = (id, e) => {
@@ -311,6 +378,7 @@ function FlowInner({ onBackToHero }) {
     setNodes(initialNodes);
     setEdges([]);
     setCurrentName('Flow nou');
+    detachFile();
   };
 
   const exportJson = () => {
@@ -335,6 +403,12 @@ function FlowInner({ onBackToHero }) {
         if (parsed.nodes) setNodes(parsed.nodes);
         if (parsed.edges) setEdges(parsed.edges);
         if (parsed.name) setCurrentName(parsed.name);
+        // Browser-ul nu suportă File System Access — nu putem scrie înapoi.
+        detachFile();
+        if (!supportsFsAccess) {
+          // Notă discretă: arătăm filename-ul ca read-only marker
+          setLinkedFile(`${file.name} (read-only — browser-ul tău nu suportă scrierea)`);
+        }
       } catch (err) {
         alert('JSON invalid: ' + err.message);
       }
@@ -370,9 +444,28 @@ function FlowInner({ onBackToHero }) {
           placeholder="Numele flowului"
         />
 
+        {linkedFile && (
+          <span className="pf-file-chip" title="Fișier legat — Salvează scrie aici">
+            📎 {linkedFile}
+            <button
+              className="pf-file-chip__close"
+              onClick={detachFile}
+              title="Detașează"
+            >
+              ×
+            </button>
+          </span>
+        )}
+
         <div className="pf-toolbar__group">
           <button className="pf-btn" onClick={handleNew}>📄 Nou</button>
-          <button className="pf-btn" onClick={handleSave}>💾 Salvează</button>
+          <button
+            className="pf-btn"
+            onClick={handleSave}
+            title={fileHandleRef.current ? `Salvează în ${linkedFile} + localStorage` : 'Salvează în localStorage'}
+          >
+            💾 Salvează
+          </button>
         </div>
 
         <div className="pf-toolbar__group">
@@ -390,14 +483,27 @@ function FlowInner({ onBackToHero }) {
         </div>
 
         <div className="pf-toolbar__group">
+          <button className="pf-btn" onClick={openFile} title="Deschide JSON din disk (sync bidirecțional unde e suportat)">
+            📂 Deschide
+          </button>
+          <button className="pf-btn" onClick={saveAs} title="Salvează ca fișier nou pe disk">
+            💾 Salvează ca…
+          </button>
+        </div>
+
+        <div className="pf-toolbar__group">
           <button className="pf-btn" onClick={exportJson}>⬇ JSON</button>
           <button className="pf-btn" onClick={() => exportPng(currentName, nodes)}>⬇ PNG</button>
           <button className="pf-btn" onClick={() => exportSvg(currentName, nodes)}>⬇ SVG</button>
-          <label className="pf-btn pf-btn--label">
-            ⬆ Import
-            <input type="file" accept=".json" onChange={importJson} hidden />
-          </label>
         </div>
+
+        <input
+          ref={legacyImportInputRef}
+          type="file"
+          accept=".json"
+          onChange={importJson}
+          hidden
+        />
 
         <div className="pf-toolbar__spacer" />
 
