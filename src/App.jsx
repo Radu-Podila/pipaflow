@@ -55,22 +55,24 @@ const HISTORY_LIMIT = 50;
 
 const PALETTE = [
   { key: 'start',    kind: 'terminal', variant: 'start', label: 'Start',    dot: '#0a0a0a', sample: 'pill-w' },
-  { key: 'action',   kind: 'default',                    label: 'Acțiune',  dot: '#0a0a0a', sample: 'box-w'  },
+  { key: 'action',   kind: 'box',                        label: 'Acțiune',  dot: '#0a0a0a', sample: 'box-w'  },
   { key: 'decision', kind: 'decision',                   label: 'Decizie?', dot: '#0a0a0a', sample: 'diamond' },
   { key: 'end',      kind: 'terminal', variant: 'end',   label: 'Final',    dot: '#e11d3f', sample: 'pill-r' },
   { key: 'note',     kind: 'sticky',                     label: 'Notă',     dot: '#fbbf24', sample: 'note'   },
 ];
 
-// 60-30-10 fill palette — toate respectă tematica red/white/black
+// 60-30-10 fill palette — culori care păstrează tematica + 2 hazard accents (verde toxic + portocaliu flame)
 const FILL_COLORS = [
-  { key: 'reset',    label: 'Default',  bg: null,        fg: null,      border: null,      hint: 'Resetează la culoarea default' },
-  { key: 'snow',     label: 'Snow',     bg: '#fafafa',   fg: '#0a0a0a', border: '#0a0a0a', hint: 'Off-white' },
-  { key: 'ash',      label: 'Ash',      bg: '#e5e5e5',   fg: '#0a0a0a', border: '#0a0a0a', hint: 'Gri deschis' },
-  { key: 'butter',   label: 'Butter',   bg: '#fff8c5',   fg: '#0a0a0a', border: '#0a0a0a', hint: 'Galben sticky' },
-  { key: 'blush',    label: 'Blush',    bg: '#fce7e8',   fg: '#0a0a0a', border: '#0a0a0a', hint: 'Roșu washed' },
-  { key: 'danger',   label: 'Danger',   bg: '#e11d3f',   fg: '#ffffff', border: '#0a0a0a', hint: 'Roșu plin' },
-  { key: 'wine',     label: 'Wine',     bg: '#7a0e22',   fg: '#ffffff', border: '#0a0a0a', hint: 'Roșu închis' },
-  { key: 'noir',     label: 'Noir',     bg: '#0a0a0a',   fg: '#ffffff', border: '#0a0a0a', hint: 'Negru' },
+  { key: 'reset',  label: 'Default', bg: null,      fg: null,      border: null,      hint: 'Resetează la culoarea default' },
+  { key: 'snow',   label: 'Snow',    bg: '#fafafa', fg: '#0a0a0a', border: '#0a0a0a', hint: 'Off-white' },
+  { key: 'ash',    label: 'Ash',     bg: '#e5e5e5', fg: '#0a0a0a', border: '#0a0a0a', hint: 'Gri deschis' },
+  { key: 'butter', label: 'Butter',  bg: '#fff8c5', fg: '#0a0a0a', border: '#0a0a0a', hint: 'Galben sticky' },
+  { key: 'flame',  label: 'Flame',   bg: '#ea580c', fg: '#ffffff', border: '#0a0a0a', hint: 'Portocaliu hazard' },
+  { key: 'blush',  label: 'Blush',   bg: '#fce7e8', fg: '#0a0a0a', border: '#0a0a0a', hint: 'Roșu washed' },
+  { key: 'danger', label: 'Danger',  bg: '#e11d3f', fg: '#ffffff', border: '#0a0a0a', hint: 'Roșu plin' },
+  { key: 'wine',   label: 'Wine',    bg: '#7a0e22', fg: '#ffffff', border: '#0a0a0a', hint: 'Roșu închis' },
+  { key: 'toxic',  label: 'Toxic',   bg: '#84cc16', fg: '#0a0a0a', border: '#0a0a0a', hint: 'Verde toxic' },
+  { key: 'noir',   label: 'Noir',    bg: '#0a0a0a', fg: '#ffffff', border: '#0a0a0a', hint: 'Negru' },
 ];
 
 const initialNodes = [
@@ -102,7 +104,27 @@ function buildNode(preset, position) {
       position,
     };
   }
-  return { id, type: 'default', data: { label: preset.label }, position };
+  // box (action)
+  return { id, type: 'box', data: { label: preset.label }, position };
+}
+
+// Backwards-compat: convert legacy default nodes (din versiunea pre-Tailwind) la box
+function migrateNodes(arr) {
+  return arr.map((n) => {
+    if (!n.type || n.type === 'default') {
+      const fillFromStyle =
+        n.style && n.style.background
+          ? { bg: n.style.background, fg: n.style.color, border: n.style.borderColor }
+          : undefined;
+      return {
+        ...n,
+        type: 'box',
+        data: { ...n.data, ...(fillFromStyle ? { fillColor: fillFromStyle } : {}) },
+        style: undefined,
+      };
+    }
+    return n;
+  });
 }
 
 function PaletteSample({ kind }) {
@@ -135,6 +157,8 @@ function FlowInner({ onBackToHero }) {
   const fileHandleRef = useRef(null);
   const [linkedFile, setLinkedFile] = useState(null);
   const legacyImportInputRef = useRef(null);
+  const clipboardRef = useRef(null);
+  const mousePosRef = useRef(null);
 
   const snapshot = useCallback(() => {
     past.current.push({
@@ -149,7 +173,7 @@ function FlowInner({ onBackToHero }) {
   useEffect(() => {
     const cur = loadCurrent();
     if (cur) {
-      if (cur.nodes) setNodes(cur.nodes);
+      if (cur.nodes) setNodes(migrateNodes(cur.nodes));
       if (cur.edges) setEdges(cur.edges);
       if (cur.name) setCurrentName(cur.name);
     }
@@ -325,6 +349,66 @@ function FlowInner({ onBackToHero }) {
     );
   };
 
+  const copySelection = () => {
+    const selectedNodes = nodes.filter((n) => n.selected);
+    if (!selectedNodes.length) return;
+    const ids = new Set(selectedNodes.map((n) => n.id));
+    const internalEdges = edges.filter(
+      (e) => ids.has(e.source) && ids.has(e.target),
+    );
+    clipboardRef.current = {
+      nodes: structuredClone(selectedNodes),
+      edges: structuredClone(internalEdges),
+    };
+  };
+
+  const pasteFromClipboard = () => {
+    const clip = clipboardRef.current;
+    if (!clip || !clip.nodes.length) return;
+    snapshot();
+
+    const minX = Math.min(...clip.nodes.map((n) => n.position.x));
+    const minY = Math.min(...clip.nodes.map((n) => n.position.y));
+
+    let target;
+    if (mousePosRef.current) {
+      target = rf.screenToFlowPosition(mousePosRef.current);
+    } else {
+      target = { x: minX + 40, y: minY + 40 };
+    }
+
+    const idMap = new Map();
+    const newNodes = clip.nodes.map((n) => {
+      const newId = makeId();
+      idMap.set(n.id, newId);
+      return {
+        ...n,
+        id: newId,
+        position: {
+          x: target.x + (n.position.x - minX),
+          y: target.y + (n.position.y - minY),
+        },
+        selected: true,
+      };
+    });
+    const newEdges = clip.edges.map((e) => ({
+      ...e,
+      id: makeId('e'),
+      source: idMap.get(e.source),
+      target: idMap.get(e.target),
+      selected: false,
+    }));
+
+    setNodes((nds) => [
+      ...nds.map((n) => ({ ...n, selected: false })),
+      ...newNodes,
+    ]);
+    setEdges((eds) => [
+      ...eds.map((e) => ({ ...e, selected: false })),
+      ...newEdges,
+    ]);
+  };
+
   const undo = () => {
     if (!past.current.length) return;
     const prev = past.current.pop();
@@ -368,11 +452,22 @@ function FlowInner({ onBackToHero }) {
       } else if ((meta && k === 'z' && e.shiftKey) || (meta && k === 'y')) {
         e.preventDefault();
         redo();
+      } else if (meta && k === 'c') {
+        e.preventDefault();
+        copySelection();
+      } else if (meta && k === 'v') {
+        e.preventDefault();
+        pasteFromClipboard();
+      } else if (meta && k === 'd') {
+        e.preventDefault();
+        copySelection();
+        pasteFromClipboard();
       } else if (e.code === 'Space' && !e.repeat) {
         e.preventDefault();
         setSpaceHeld(true);
       } else if (e.key === 'Escape') {
         setContextMenu(null);
+        setNodeMenu(null);
       }
     };
     const onKeyUp = (e) => {
@@ -389,6 +484,16 @@ function FlowInner({ onBackToHero }) {
       window.removeEventListener('blur', onBlur);
     };
   }, [editingNodeId]);
+
+  useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+    const onMove = (e) => {
+      mousePosRef.current = { x: e.clientX, y: e.clientY };
+    };
+    el.addEventListener('mousemove', onMove);
+    return () => el.removeEventListener('mousemove', onMove);
+  }, []);
 
   const detachFile = () => {
     fileHandleRef.current = null;
@@ -421,7 +526,7 @@ function FlowInner({ onBackToHero }) {
       if (!result) return;
       const parsed = JSON.parse(result.text);
       snapshot();
-      if (parsed.nodes) setNodes(parsed.nodes);
+      if (parsed.nodes) setNodes(migrateNodes(parsed.nodes));
       if (parsed.edges) setEdges(parsed.edges);
       if (parsed.name) setCurrentName(parsed.name);
       fileHandleRef.current = result.handle;
@@ -456,7 +561,7 @@ function FlowInner({ onBackToHero }) {
     const data = loadFlow(id);
     if (!data) return;
     snapshot();
-    setNodes(data.nodes || []);
+    setNodes(migrateNodes(data.nodes || []));
     setEdges(data.edges || []);
     setCurrentName(data.name || id);
     detachFile();
@@ -495,7 +600,7 @@ function FlowInner({ onBackToHero }) {
       try {
         const parsed = JSON.parse(ev.target.result);
         snapshot();
-        if (parsed.nodes) setNodes(parsed.nodes);
+        if (parsed.nodes) setNodes(migrateNodes(parsed.nodes));
         if (parsed.edges) setEdges(parsed.edges);
         if (parsed.name) setCurrentName(parsed.name);
         detachFile();
@@ -822,7 +927,7 @@ function FlowInner({ onBackToHero }) {
             <div className="px-3 py-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.25em] text-[var(--color-fg-soft)]">
               Umple cu
             </div>
-            <div className="grid grid-cols-4 gap-1 px-2 pb-2">
+            <div className="grid grid-cols-5 gap-1 px-2 pb-2">
               {FILL_COLORS.map((c) => (
                 <button
                   key={c.key}
@@ -873,7 +978,7 @@ function FlowInner({ onBackToHero }) {
       {/* ───── Status bar ───── */}
       <footer className="flex flex-wrap items-center justify-between gap-3 border-t-[3px] border-black bg-black px-4 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-white">
         <span className="text-white/80">
-          drag = select · <span className="text-[var(--color-danger)]">space</span>+drag = pan · right-click pe canvas = adaugă · right-click pe bulă = umple/șterge · 2× click pe edge = șterge · ctrl+z = undo
+          drag = select · <span className="text-[var(--color-danger)]">space</span>+drag = pan · right-click = meniu · ctrl+c/v = copy/paste · ctrl+d = duplică · ctrl+z = undo · 2× click pe edge = șterge
         </span>
         <span className="text-white/40">
           {nodes.length} noduri · {edges.length} edges
