@@ -243,6 +243,15 @@
   min-height: 0;
 }
 
+.pf-canvas--pan,
+.pf-canvas--pan .react-flow__pane,
+.pf-canvas--pan .react-flow__renderer { cursor: grab !important; }
+.pf-canvas--pan:active,
+.pf-canvas--pan .react-flow__pane:active,
+.pf-canvas--pan.react-flow__pane.dragging { cursor: grabbing !important; }
+
+.pf-canvas:not(.pf-canvas--pan) .react-flow__pane { cursor: crosshair; }
+
 .react-flow__node {
   font-size: 14px !important;
   line-height: 1.4 !important;

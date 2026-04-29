@@ -5,6 +5,7 @@ import {
   Background,
   Controls,
   MiniMap,
+  SelectionMode,
   addEdge,
   applyNodeChanges,
   applyEdgeChanges,
@@ -105,6 +106,7 @@ function FlowInner({ onBackToHero }) {
   const future = useRef([]);
   const [, forceTick] = useState(0);
   const bumpUi = () => forceTick((t) => t + 1);
+  const [spaceHeld, setSpaceHeld] = useState(false);
 
   const snapshot = useCallback(() => {
     past.current.push({
@@ -219,23 +221,43 @@ function FlowInner({ onBackToHero }) {
     bumpUi();
   };
 
+  const isTypingTarget = (el) => {
+    if (!el) return false;
+    const tag = el.tagName;
+    return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable;
+  };
+
   useEffect(() => {
-    const onKey = (e) => {
-      if (editingNodeId) return;
+    const onKeyDown = (e) => {
+      if (editingNodeId || isTypingTarget(e.target)) return;
+
       const meta = e.ctrlKey || e.metaKey;
-      if (meta && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+      const k = e.key.toLowerCase();
+
+      if (meta && k === 'z' && !e.shiftKey) {
         e.preventDefault();
         undo();
-      } else if (
-        (meta && e.key.toLowerCase() === 'z' && e.shiftKey) ||
-        (meta && e.key.toLowerCase() === 'y')
-      ) {
+      } else if ((meta && k === 'z' && e.shiftKey) || (meta && k === 'y')) {
         e.preventDefault();
         redo();
+      } else if (e.code === 'Space' && !e.repeat) {
+        e.preventDefault();
+        setSpaceHeld(true);
       }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    const onKeyUp = (e) => {
+      if (e.code === 'Space') setSpaceHeld(false);
+    };
+    const onBlur = () => setSpaceHeld(false);
+
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
+    };
   }, [editingNodeId]);
 
   const handleSave = () => {
@@ -384,7 +406,10 @@ function FlowInner({ onBackToHero }) {
         </section>
       )}
 
-      <div className="pf-canvas" ref={wrapperRef}>
+      <div
+        className={`pf-canvas${spaceHeld ? ' pf-canvas--pan' : ''}`}
+        ref={wrapperRef}
+      >
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -403,6 +428,9 @@ function FlowInner({ onBackToHero }) {
           deleteKeyCode={['Delete', 'Backspace']}
           snapToGrid
           snapGrid={[10, 10]}
+          panOnDrag={spaceHeld}
+          selectionOnDrag={!spaceHeld}
+          selectionMode={SelectionMode.Partial}
         >
           <Background gap={20} size={1} />
           <Controls />
@@ -428,7 +456,7 @@ function FlowInner({ onBackToHero }) {
       </div>
 
       <footer className="pf-help">
-        💡 <strong>Cum folosești:</strong> butoanele „+" adaugă bule · trage de la punctul unei bule ca s-o conectezi · dublu-click pe bulă schimbă textul · <strong>dublu-click pe săgeată o șterge</strong> · click + Delete șterge selecția · Ctrl+Z undo · „Aranjează" face layout automat
+        💡 <strong>Cum folosești:</strong> trage prin canvas = <strong>selecție multiplă</strong> · ține <strong>Space + drag = pan (mănușă)</strong> · butoanele „+" adaugă bule · trage de la punctul unei bule ca s-o conectezi · dublu-click pe bulă schimbă textul · dublu-click pe săgeată o șterge · Delete șterge selecția · Ctrl+Z undo
       </footer>
     </div>
   );
