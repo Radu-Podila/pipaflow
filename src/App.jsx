@@ -107,6 +107,7 @@ function FlowInner({ onBackToHero }) {
   const [, forceTick] = useState(0);
   const bumpUi = () => forceTick((t) => t + 1);
   const [spaceHeld, setSpaceHeld] = useState(false);
+  const [contextMenu, setContextMenu] = useState(null);
 
   const snapshot = useCallback(() => {
     past.current.push({
@@ -160,20 +161,43 @@ function FlowInner({ onBackToHero }) {
     setEdges((eds) => eds.filter((e) => e.id !== edge.id));
   }, [snapshot]);
 
-  const addNode = (preset) => {
+  const addNode = (preset, atFlowPos = null) => {
     snapshot();
-    const center = wrapperRef.current
-      ? rf.screenToFlowPosition({
-          x: wrapperRef.current.clientWidth / 2,
-          y: wrapperRef.current.clientHeight / 2,
-        })
-      : { x: 200, y: 200 };
-    const position = {
-      x: center.x - 90 + Math.random() * 60,
-      y: center.y - 30 + Math.random() * 60,
-    };
+    let position;
+    if (atFlowPos) {
+      position = { x: atFlowPos.x - 70, y: atFlowPos.y - 20 };
+    } else {
+      const center = wrapperRef.current
+        ? rf.screenToFlowPosition({
+            x: wrapperRef.current.clientWidth / 2,
+            y: wrapperRef.current.clientHeight / 2,
+          })
+        : { x: 200, y: 200 };
+      position = {
+        x: center.x - 90 + Math.random() * 60,
+        y: center.y - 30 + Math.random() * 60,
+      };
+    }
     setNodes((nds) => [...nds, buildNode(preset, position)]);
   };
+
+  const onPaneContextMenu = useCallback((e) => {
+    e.preventDefault();
+    if (!wrapperRef.current) return;
+    const rect = wrapperRef.current.getBoundingClientRect();
+    const flowPos = rf.screenToFlowPosition({ x: e.clientX, y: e.clientY });
+    const menuW = 200;
+    const menuH = 240;
+    const localX = e.clientX - rect.left;
+    const localY = e.clientY - rect.top;
+    setContextMenu({
+      x: Math.min(localX, rect.width - menuW - 8),
+      y: Math.min(localY, rect.height - menuH - 8),
+      flowPos,
+    });
+  }, [rf]);
+
+  const closeContextMenu = useCallback(() => setContextMenu(null), []);
 
   const onNodeDoubleClick = (_, node) => setEditingNodeId(node.id);
 
@@ -243,6 +267,8 @@ function FlowInner({ onBackToHero }) {
       } else if (e.code === 'Space' && !e.repeat) {
         e.preventDefault();
         setSpaceHeld(true);
+      } else if (e.key === 'Escape') {
+        setContextMenu(null);
       }
     };
     const onKeyUp = (e) => {
@@ -420,6 +446,9 @@ function FlowInner({ onBackToHero }) {
           onNodeDoubleClick={onNodeDoubleClick}
           onEdgeDoubleClick={onEdgeDoubleClick}
           onNodeDragStart={snapshot}
+          onPaneContextMenu={onPaneContextMenu}
+          onPaneClick={closeContextMenu}
+          onMoveStart={closeContextMenu}
           defaultEdgeOptions={{
             style: { strokeWidth: 2, stroke: '#495057' },
             interactionWidth: 24,
@@ -453,10 +482,36 @@ function FlowInner({ onBackToHero }) {
             </div>
           </div>
         )}
+
+        {contextMenu && (
+          <div
+            className="pf-ctx-menu"
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+            onContextMenu={(e) => e.preventDefault()}
+          >
+            <div className="pf-ctx-menu__title">Adaugă bulă aici</div>
+            {PALETTE.map((p) => (
+              <button
+                key={p.key}
+                className="pf-ctx-menu__item"
+                onClick={() => {
+                  addNode(p, contextMenu.flowPos);
+                  setContextMenu(null);
+                }}
+              >
+                <span
+                  className="pf-ctx-menu__chip"
+                  style={{ background: p.bg, borderColor: p.border }}
+                />
+                {p.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <footer className="pf-help">
-        💡 <strong>Cum folosești:</strong> trage prin canvas = <strong>selecție multiplă</strong> · ține <strong>Space + drag = pan (mănușă)</strong> · butoanele „+" adaugă bule · trage de la punctul unei bule ca s-o conectezi · dublu-click pe bulă schimbă textul · dublu-click pe săgeată o șterge · Delete șterge selecția · Ctrl+Z undo
+        💡 <strong>Cum folosești:</strong> drag pe canvas = <strong>selecție multiplă</strong> · <strong>Space + drag = pan (mănușă)</strong> · <strong>click dreapta = meniu „adaugă aici"</strong> · trage de la punctul unei bule ca s-o conectezi · dublu-click pe bulă schimbă textul · dublu-click pe săgeată o șterge · Delete șterge selecția · Ctrl+Z undo
       </footer>
     </div>
   );
