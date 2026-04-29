@@ -140,13 +140,23 @@ function FlowInner({ onBackToHero }) {
       snapshot();
       setEdges((eds) =>
         addEdge(
-          { ...params, animated: false, style: { strokeWidth: 2 } },
+          {
+            ...params,
+            animated: false,
+            style: { strokeWidth: 2, stroke: '#495057' },
+            interactionWidth: 24,
+          },
           eds,
         ),
       );
     },
     [snapshot],
   );
+
+  const onEdgeDoubleClick = useCallback((_, edge) => {
+    snapshot();
+    setEdges((eds) => eds.filter((e) => e.id !== edge.id));
+  }, [snapshot]);
 
   const addNode = (preset) => {
     snapshot();
@@ -383,7 +393,12 @@ function FlowInner({ onBackToHero }) {
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           onNodeDoubleClick={onNodeDoubleClick}
+          onEdgeDoubleClick={onEdgeDoubleClick}
           onNodeDragStart={snapshot}
+          defaultEdgeOptions={{
+            style: { strokeWidth: 2, stroke: '#495057' },
+            interactionWidth: 24,
+          }}
           fitView
           deleteKeyCode={['Delete', 'Backspace']}
           snapToGrid
@@ -413,7 +428,7 @@ function FlowInner({ onBackToHero }) {
       </div>
 
       <footer className="pf-help">
-        💡 <strong>Cum folosești:</strong> butoanele „+" adaugă bule · trage de marginea unei bule (puncte mici) ca s-o conectezi · dublu-click ca să schimbi textul · Delete șterge · Ctrl+Z undo · butonul „Aranjează" face layout automat
+        💡 <strong>Cum folosești:</strong> butoanele „+" adaugă bule · trage de la punctul unei bule ca s-o conectezi · dublu-click pe bulă schimbă textul · <strong>dublu-click pe săgeată o șterge</strong> · click + Delete șterge selecția · Ctrl+Z undo · „Aranjează" face layout automat
       </footer>
     </div>
   );
