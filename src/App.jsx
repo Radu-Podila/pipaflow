@@ -23,6 +23,7 @@ import {
   FileJson,
   FilePlus2,
   FolderOpen,
+  GitBranch,
   Image as ImageIcon,
   Plus,
   Redo2,
@@ -34,6 +35,7 @@ import {
 } from 'lucide-react';
 
 import Hero from '@/components/Hero.jsx';
+import { GitHubPanel } from '@/components/GitHubPanel.jsx';
 import { nodeTypes } from '@/components/nodes.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { Input } from '@/components/ui/input.jsx';
@@ -63,6 +65,17 @@ const ARROW_FROM = { ...ARROW };
 function migrateEdges(arr) {
   return arr.map((e) => (e.markerEnd || e.markerStart ? e : { ...e, markerEnd: { ...ARROW } }));
 }
+
+const EDGE_COLORS = [
+  { key: 'noir',    color: '#0a0a0a', label: 'Negru'    },
+  { key: 'muted',   color: '#737373', label: 'Gri'      },
+  { key: 'danger',  color: '#e11d3f', label: 'Roșu'     },
+  { key: 'flame',   color: '#ea580c', label: 'Portocaliu'},
+  { key: 'amber',   color: '#d97706', label: 'Galben'   },
+  { key: 'toxic',   color: '#84cc16', label: 'Verde'    },
+  { key: 'blue',    color: '#2563eb', label: 'Albastru' },
+  { key: 'purple',  color: '#7c3aed', label: 'Violet'   },
+];
 
 const PALETTE = [
   { key: 'start',    kind: 'terminal', variant: 'start', label: 'Start',    dot: '#0a0a0a', sample: 'pill-w' },
@@ -172,6 +185,8 @@ function FlowInner({ onBackToHero }) {
   const legacyImportInputRef = useRef(null);
   const clipboardRef = useRef(null);
   const mousePosRef = useRef(null);
+  const [editingNoteNodeId, setEditingNoteNodeId] = useState(null);
+  const [showGitHub, setShowGitHub] = useState(false);
   const [aiCopied, setAiCopied] = useState(false);
 
   const snapshot = useCallback(() => {
@@ -394,6 +409,22 @@ function FlowInner({ onBackToHero }) {
     );
   };
 
+  const setEdgeColor = (edgeId, color) => {
+    snapshot();
+    setEdges((eds) =>
+      eds.map((e) => {
+        if (e.id !== edgeId) return e;
+        const next = {
+          ...e,
+          style: { ...(e.style || {}), stroke: color },
+        };
+        if (next.markerEnd) next.markerEnd = { ...next.markerEnd, color };
+        if (next.markerStart) next.markerStart = { ...next.markerStart, color };
+        return next;
+      }),
+    );
+  };
+
   const updateEdgeLabel = (id, label) => {
     setEdges((eds) =>
       eds.map((e) => {
@@ -475,6 +506,21 @@ function FlowInner({ onBackToHero }) {
   };
 
   const onNodeDoubleClick = (_, node) => setEditingNodeId(node.id);
+
+  const updateNodeNote = (id, note) => {
+    setNodes((nds) =>
+      nds.map((n) => {
+        if (n.id !== id) return n;
+        const trimmed = (note ?? '').trim();
+        if (!trimmed) {
+          const newData = { ...n.data };
+          delete newData.note;
+          return { ...n, data: newData };
+        }
+        return { ...n, data: { ...n.data, note: trimmed } };
+      }),
+    );
+  };
 
   const updateNodeLabel = (id, label) => {
     setNodes((nds) =>
@@ -588,7 +634,7 @@ function FlowInner({ onBackToHero }) {
 
   useEffect(() => {
     const onKeyDown = (e) => {
-      if (editingNodeId || editingEdgeId || isTypingTarget(e.target)) return;
+      if (editingNodeId || editingEdgeId || editingNoteNodeId || isTypingTarget(e.target)) return;
 
       const meta = e.ctrlKey || e.metaKey;
       const k = e.key.toLowerCase();
@@ -615,6 +661,7 @@ function FlowInner({ onBackToHero }) {
       } else if (e.key === 'Escape') {
         setContextMenu(null);
         setNodeMenu(null);
+        setEditingNoteNodeId(null);
       }
     };
     const onKeyUp = (e) => {
@@ -781,13 +828,15 @@ function FlowInner({ onBackToHero }) {
 
   const autoLayout = (direction = 'TB') => {
     snapshot();
-    const laid = layoutDagre(nodes, edges, direction);
-    setNodes(laid);
+    const { nodes: laidNodes, edges: laidEdges } = layoutDagre(nodes, edges, direction);
+    setNodes(laidNodes);
+    setEdges(laidEdges);
     requestAnimationFrame(() => rf.fitView({ padding: 0.2, duration: 300 }));
   };
 
   const editingNode = nodes.find((n) => n.id === editingNodeId);
   const editingEdge = edges.find((e) => e.id === editingEdgeId);
+  const editingNoteNode = nodes.find((n) => n.id === editingNoteNodeId);
   const canUndo = past.current.length > 0;
   const canRedo = future.current.length > 0;
 
@@ -897,6 +946,14 @@ function FlowInner({ onBackToHero }) {
               <Bot className="h-3.5 w-3.5" /> Pentru AI
             </>
           )}
+        </Button>
+
+        <Button
+          variant={showGitHub ? 'primary' : 'default'}
+          onClick={() => setShowGitHub((v) => !v)}
+          title="Conectează GitHub pentru versionare"
+        >
+          <GitBranch className="h-3.5 w-3.5" /> GitHub
         </Button>
 
         <input
@@ -1105,6 +1162,62 @@ function FlowInner({ onBackToHero }) {
           </div>
         )}
 
+        {/* Note modal */}
+        {editingNoteNode && (
+          <div
+            className="absolute inset-0 z-[100] flex items-center justify-center bg-black/50"
+            onClick={() => setEditingNoteNodeId(null)}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="w-[420px] max-w-[90vw] border-[3px] border-black bg-white shadow-[8px_8px_0_0_#000]"
+            >
+              <div className="flex items-center justify-between border-b-[2.5px] border-black bg-[#fff8c5] px-4 py-2">
+                <span className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#0a0a0a]">
+                  ✎ Notă internă
+                </span>
+                <button
+                  onClick={() => setEditingNoteNodeId(null)}
+                  className="hover:opacity-70"
+                  title="Închide (Esc)"
+                >
+                  <X className="h-4 w-4" strokeWidth={3} />
+                </button>
+              </div>
+              <div className="flex flex-col gap-3 p-4">
+                <p className="font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-[var(--color-fg-soft)]">
+                  Apare în colțul bulei — hover ca să citești. Gol = șterge nota.
+                </p>
+                <textarea
+                  autoFocus
+                  rows={4}
+                  defaultValue={editingNoteNode.data.note || ''}
+                  onChange={(e) => updateNodeNote(editingNoteNode.id, e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') setEditingNoteNodeId(null);
+                  }}
+                  className="w-full border-[2.5px] border-black bg-[#fffef0] p-3 font-hand text-[14px] leading-snug shadow-[3px_3px_0_0_#000] placeholder:text-[var(--color-fg-mute)] focus:border-[#0a0a0a] focus:outline-none resize-none"
+                  placeholder="Comentariu, context, referință..."
+                />
+                <div className="flex items-center justify-between">
+                  <button
+                    onClick={() => {
+                      updateNodeNote(editingNoteNode.id, '');
+                      setEditingNoteNodeId(null);
+                    }}
+                    className="font-mono text-[10px] font-bold uppercase tracking-wider text-[var(--color-fg-soft)] underline-offset-4 hover:text-[var(--color-danger)] hover:underline"
+                  >
+                    Șterge nota
+                  </button>
+                  <Button variant="primary" onClick={() => setEditingNoteNodeId(null)}>
+                    Gata
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Pane context menu (right-click pe canvas) */}
         {contextMenu && (
           <div
@@ -1163,6 +1276,20 @@ function FlowInner({ onBackToHero }) {
             >
               <span className="inline-flex h-4 w-4 items-center justify-center border-2 border-current font-mono text-[9px]">+</span>
               Duplică
+            </button>
+
+            <button
+              onClick={() => {
+                setEditingNoteNodeId(nodeMenu.nodeId);
+                setNodeMenu(null);
+              }}
+              className="flex w-full items-center gap-3 px-3 py-2 text-left font-bold text-[12px] uppercase tracking-wider hover:bg-[var(--color-fg)] hover:text-white"
+            >
+              <span className="inline-flex h-4 w-4 items-center justify-center border-2 border-current font-mono text-[9px]" style={{ background: '#fff8c5' }}>✎</span>
+              {(() => {
+                const n = nodes.find((nd) => nd.id === nodeMenu.nodeId);
+                return n?.data?.note ? 'Editează notă' : 'Adaugă notă';
+              })()}
             </button>
 
             <div className="my-1 h-[2px] bg-black" />
@@ -1292,6 +1419,28 @@ function FlowInner({ onBackToHero }) {
 
               <div className="my-1 h-[2px] bg-black" />
 
+              <div className="px-3 py-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.25em] text-[var(--color-fg-soft)]">
+                Culoare
+              </div>
+              <div className="grid grid-cols-8 gap-1 px-2 pb-2">
+                {EDGE_COLORS.map((c) => {
+                  const active = (ed.style?.stroke || '#0a0a0a') === c.color;
+                  return (
+                    <button
+                      key={c.key}
+                      title={c.label}
+                      onClick={() => { setEdgeColor(edgeMenu.edgeId, c.color); setEdgeMenu(null); }}
+                      className="relative h-7 w-full border-[2.5px] border-black transition-transform duration-100 hover:-translate-y-[1px] hover:shadow-[2px_2px_0_0_#000]"
+                      style={{ background: c.color }}
+                    >
+                      {active && <span className="absolute inset-0 flex items-center justify-center text-white font-black text-[10px]">✓</span>}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="my-1 h-[2px] bg-black" />
+
               <button
                 onClick={() => {
                   setEditingEdgeId(edgeMenu.edgeId);
@@ -1390,6 +1539,22 @@ function FlowInner({ onBackToHero }) {
             </div>
           );
         })()}
+
+        {/* GitHub panel */}
+        {showGitHub && (
+          <GitHubPanel
+            flowName={currentName}
+            nodes={nodes}
+            edges={edges}
+            onLoad={(parsed) => {
+              snapshot();
+              if (parsed.nodes) setNodes(migrateNodes(parsed.nodes));
+              if (parsed.edges) setEdges(migrateEdges(parsed.edges));
+              if (parsed.name) setCurrentName(parsed.name);
+            }}
+            onClose={() => setShowGitHub(false)}
+          />
+        )}
       </div>
 
       {/* ───── Status bar ───── */}
