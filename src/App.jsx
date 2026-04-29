@@ -5,6 +5,7 @@ import {
   Background,
   Controls,
   MiniMap,
+  MarkerType,
   SelectionMode,
   addEdge,
   applyNodeChanges,
@@ -52,6 +53,13 @@ import {
 } from '@/lib/fsAccess.js';
 
 const HISTORY_LIMIT = 50;
+
+const ARROW = { type: MarkerType.ArrowClosed, color: '#0a0a0a', width: 18, height: 18 };
+const ARROW_FROM = { ...ARROW };
+
+function migrateEdges(arr) {
+  return arr.map((e) => (e.markerEnd || e.markerStart ? e : { ...e, markerEnd: { ...ARROW } }));
+}
 
 const PALETTE = [
   { key: 'start',    kind: 'terminal', variant: 'start', label: 'Start',    dot: '#0a0a0a', sample: 'pill-w' },
@@ -175,7 +183,7 @@ function FlowInner({ onBackToHero }) {
     const cur = loadCurrent();
     if (cur) {
       if (cur.nodes) setNodes(migrateNodes(cur.nodes));
-      if (cur.edges) setEdges(cur.edges);
+      if (cur.edges) setEdges(migrateEdges(cur.edges));
       if (cur.name) setCurrentName(cur.name);
     }
     setSavedFlows(loadList());
@@ -200,6 +208,7 @@ function FlowInner({ onBackToHero }) {
             animated: false,
             style: { strokeWidth: 2.5, stroke: '#0a0a0a' },
             interactionWidth: 24,
+            markerEnd: { ...ARROW },
           },
           eds,
         ),
@@ -372,6 +381,30 @@ function FlowInner({ onBackToHero }) {
           };
         }
         return e;
+      }),
+    );
+  };
+
+  const setEdgeArrow = (edgeId, mode) => {
+    snapshot();
+    setEdges((eds) =>
+      eds.map((e) => {
+        if (e.id !== edgeId) return e;
+        const next = { ...e };
+        if (mode === 'none') {
+          delete next.markerEnd;
+          delete next.markerStart;
+        } else if (mode === 'end') {
+          next.markerEnd = { ...ARROW };
+          delete next.markerStart;
+        } else if (mode === 'start') {
+          next.markerStart = { ...ARROW_FROM };
+          delete next.markerEnd;
+        } else if (mode === 'both') {
+          next.markerEnd = { ...ARROW };
+          next.markerStart = { ...ARROW_FROM };
+        }
+        return next;
       }),
     );
   };
@@ -611,7 +644,7 @@ function FlowInner({ onBackToHero }) {
       const parsed = JSON.parse(result.text);
       snapshot();
       if (parsed.nodes) setNodes(migrateNodes(parsed.nodes));
-      if (parsed.edges) setEdges(parsed.edges);
+      if (parsed.edges) setEdges(migrateEdges(parsed.edges));
       if (parsed.name) setCurrentName(parsed.name);
       fileHandleRef.current = result.handle;
       setLinkedFile(result.name);
@@ -646,7 +679,7 @@ function FlowInner({ onBackToHero }) {
     if (!data) return;
     snapshot();
     setNodes(migrateNodes(data.nodes || []));
-    setEdges(data.edges || []);
+    setEdges(migrateEdges(data.edges || []));
     setCurrentName(data.name || id);
     detachFile();
   };
@@ -685,7 +718,7 @@ function FlowInner({ onBackToHero }) {
         const parsed = JSON.parse(ev.target.result);
         snapshot();
         if (parsed.nodes) setNodes(migrateNodes(parsed.nodes));
-        if (parsed.edges) setEdges(parsed.edges);
+        if (parsed.edges) setEdges(migrateEdges(parsed.edges));
         if (parsed.name) setCurrentName(parsed.name);
         detachFile();
         if (!supportsFsAccess) {
@@ -893,6 +926,7 @@ function FlowInner({ onBackToHero }) {
           defaultEdgeOptions={{
             style: { strokeWidth: 2.5, stroke: '#0a0a0a' },
             interactionWidth: 24,
+            markerEnd: { ...ARROW },
           }}
           fitView
           deleteKeyCode={['Delete', 'Backspace']}
@@ -1131,6 +1165,69 @@ function FlowInner({ onBackToHero }) {
                   </line>
                 }
               />
+
+              <div className="my-1 h-[2px] bg-black" />
+
+              <div className="px-3 py-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.25em] text-[var(--color-fg-soft)]">
+                Săgeată
+              </div>
+              {(() => {
+                const arrowMode = ed.markerStart && ed.markerEnd
+                  ? 'both'
+                  : ed.markerStart
+                    ? 'start'
+                    : ed.markerEnd
+                      ? 'end'
+                      : 'none';
+                const ArrowOpt = ({ mode, label, preview }) => (
+                  <button
+                    onClick={() => { setEdgeArrow(edgeMenu.edgeId, mode); setEdgeMenu(null); }}
+                    className={cn(
+                      'flex w-full items-center gap-3 px-3 py-2 text-left font-bold text-[12px] uppercase tracking-wider',
+                      arrowMode === mode
+                        ? 'bg-[var(--color-danger)] text-white'
+                        : 'hover:bg-[var(--color-fg)] hover:text-white',
+                    )}
+                  >
+                    <span className="inline-block w-[40px] flex-shrink-0">
+                      <svg width="40" height="14" viewBox="0 0 40 14">
+                        <defs>
+                          <marker id={`pf-arrow-${mode}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M0,0 L10,5 L0,10 Z" fill="currentColor" />
+                          </marker>
+                        </defs>
+                        {preview(`pf-arrow-${mode}`)}
+                      </svg>
+                    </span>
+                    {label}
+                    {arrowMode === mode && <span className="ml-auto font-mono text-[10px]">●</span>}
+                  </button>
+                );
+                return (
+                  <>
+                    <ArrowOpt
+                      mode="end"
+                      label="La capăt"
+                      preview={(id) => <line x1="2" y1="7" x2="34" y2="7" stroke="currentColor" strokeWidth="2.5" markerEnd={`url(#${id})`} />}
+                    />
+                    <ArrowOpt
+                      mode="both"
+                      label="Ambele capete"
+                      preview={(id) => <line x1="6" y1="7" x2="34" y2="7" stroke="currentColor" strokeWidth="2.5" markerStart={`url(#${id})`} markerEnd={`url(#${id})`} />}
+                    />
+                    <ArrowOpt
+                      mode="start"
+                      label="Doar la început"
+                      preview={(id) => <line x1="6" y1="7" x2="38" y2="7" stroke="currentColor" strokeWidth="2.5" markerStart={`url(#${id})`} />}
+                    />
+                    <ArrowOpt
+                      mode="none"
+                      label="Fără săgeată"
+                      preview={() => <line x1="2" y1="7" x2="38" y2="7" stroke="currentColor" strokeWidth="2.5" />}
+                    />
+                  </>
+                );
+              })()}
 
               <div className="my-1 h-[2px] bg-black" />
 
