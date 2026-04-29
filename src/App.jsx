@@ -155,6 +155,7 @@ function FlowInner({ onBackToHero }) {
   const [nodes, setNodes] = useState(initialNodes);
   const [edges, setEdges] = useState([]);
   const [editingNodeId, setEditingNodeId] = useState(null);
+  const [editingEdgeId, setEditingEdgeId] = useState(null);
   const [savedFlows, setSavedFlows] = useState([]);
   const [currentName, setCurrentName] = useState('Flow nou');
 
@@ -222,9 +223,13 @@ function FlowInner({ onBackToHero }) {
   );
 
   const onEdgeDoubleClick = useCallback(
-    (_, edge) => {
-      snapshot();
-      setEdges((eds) => eds.filter((e) => e.id !== edge.id));
+    (e, edge) => {
+      if (e.shiftKey) {
+        snapshot();
+        setEdges((eds) => eds.filter((ed) => ed.id !== edge.id));
+        return;
+      }
+      setEditingEdgeId(edge.id);
     },
     [snapshot],
   );
@@ -385,6 +390,27 @@ function FlowInner({ onBackToHero }) {
           };
         }
         return e;
+      }),
+    );
+  };
+
+  const updateEdgeLabel = (id, label) => {
+    setEdges((eds) =>
+      eds.map((e) => {
+        if (e.id !== id) return e;
+        const trimmed = (label ?? '').trim();
+        if (!trimmed) {
+          const { label: _l, labelStyle, labelBgStyle, labelBgPadding, labelBgBorderRadius, ...rest } = e;
+          return rest;
+        }
+        return {
+          ...e,
+          label: trimmed,
+          labelStyle: { fill: '#ffffff', fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.1em', fontSize: 10 },
+          labelBgStyle: { fill: '#0a0a0a', stroke: '#0a0a0a', strokeWidth: 2 },
+          labelBgPadding: [10, 5],
+          labelBgBorderRadius: 0,
+        };
       }),
     );
   };
@@ -562,7 +588,7 @@ function FlowInner({ onBackToHero }) {
 
   useEffect(() => {
     const onKeyDown = (e) => {
-      if (editingNodeId || isTypingTarget(e.target)) return;
+      if (editingNodeId || editingEdgeId || isTypingTarget(e.target)) return;
 
       const meta = e.ctrlKey || e.metaKey;
       const k = e.key.toLowerCase();
@@ -604,7 +630,7 @@ function FlowInner({ onBackToHero }) {
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
     };
-  }, [editingNodeId]);
+  }, [editingNodeId, editingEdgeId]);
 
   useEffect(() => {
     const el = wrapperRef.current;
@@ -761,6 +787,7 @@ function FlowInner({ onBackToHero }) {
   };
 
   const editingNode = nodes.find((n) => n.id === editingNodeId);
+  const editingEdge = edges.find((e) => e.id === editingEdgeId);
   const canUndo = past.current.length > 0;
   const canRedo = future.current.length > 0;
 
@@ -979,6 +1006,64 @@ function FlowInner({ onBackToHero }) {
           <Controls />
           <MiniMap pannable zoomable maskColor="rgba(10,10,10,0.85)" />
         </ReactFlow>
+
+        {/* Edge label modal */}
+        {editingEdge && (
+          <div
+            className="absolute inset-0 z-[100] flex items-center justify-center bg-black/50"
+            onClick={() => setEditingEdgeId(null)}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="w-[420px] max-w-[90vw] border-[3px] border-black bg-white shadow-[8px_8px_0_0_#000]"
+            >
+              <div className="flex items-center justify-between border-b-[2.5px] border-black bg-[var(--color-danger)] px-4 py-2 text-white">
+                <span className="font-mono text-[10px] font-bold uppercase tracking-[0.25em]">
+                  ⌁ Etichetă săgeată
+                </span>
+                <button
+                  onClick={() => setEditingEdgeId(null)}
+                  className="hover:opacity-70"
+                  title="Închide (Esc)"
+                >
+                  <X className="h-4 w-4" strokeWidth={3} />
+                </button>
+              </div>
+              <div className="flex flex-col gap-3 p-4">
+                <p className="font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-[var(--color-fg-soft)]">
+                  Tipic: „yes" / „no" / „dacă fail" / „retry" — gol = șterge eticheta
+                </p>
+                <input
+                  autoFocus
+                  type="text"
+                  maxLength={50}
+                  defaultValue={editingEdge.label || ''}
+                  onChange={(e) => updateEdgeLabel(editingEdge.id, e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') setEditingEdgeId(null);
+                    if (e.key === 'Escape') setEditingEdgeId(null);
+                  }}
+                  className="w-full border-[2.5px] border-black bg-white p-3 font-mono text-[14px] font-bold uppercase tracking-wider shadow-[3px_3px_0_0_#000] placeholder:text-[var(--color-fg-mute)] placeholder:tracking-wider focus:border-[var(--color-danger)] focus:shadow-[3px_3px_0_0_var(--color-danger-deep)] focus:outline-none"
+                  placeholder="ex: YES"
+                />
+                <div className="flex items-center justify-between">
+                  <button
+                    onClick={() => {
+                      updateEdgeLabel(editingEdge.id, '');
+                      setEditingEdgeId(null);
+                    }}
+                    className="font-mono text-[10px] font-bold uppercase tracking-wider text-[var(--color-fg-soft)] underline-offset-4 hover:text-[var(--color-danger)] hover:underline"
+                  >
+                    Șterge eticheta
+                  </button>
+                  <Button variant="primary" onClick={() => setEditingEdgeId(null)}>
+                    Gata
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Edit text modal */}
         {editingNode && (
@@ -1207,6 +1292,21 @@ function FlowInner({ onBackToHero }) {
 
               <div className="my-1 h-[2px] bg-black" />
 
+              <button
+                onClick={() => {
+                  setEditingEdgeId(edgeMenu.edgeId);
+                  setEdgeMenu(null);
+                }}
+                className="group flex w-full items-center gap-3 px-3 py-2 text-left font-bold text-[12px] uppercase tracking-wider hover:bg-[var(--color-fg)] hover:text-white"
+              >
+                <span className="inline-flex h-5 min-w-[36px] items-center justify-center bg-black px-1.5 font-mono text-[9px] font-extrabold uppercase tracking-[0.1em] text-white group-hover:bg-white group-hover:text-black">
+                  {ed.label ? ed.label.slice(0, 5) : 'A → B'}
+                </span>
+                {ed.label ? 'Editează etichetă' : 'Adaugă etichetă'}
+              </button>
+
+              <div className="my-1 h-[2px] bg-black" />
+
               <div className="px-3 py-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.25em] text-[var(--color-fg-soft)]">
                 Săgeată
               </div>
@@ -1295,7 +1395,7 @@ function FlowInner({ onBackToHero }) {
       {/* ───── Status bar ───── */}
       <footer className="flex flex-wrap items-center justify-between gap-3 border-t-[3px] border-black bg-black px-4 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-white">
         <span className="text-white/80">
-          drag = select · <span className="text-[var(--color-danger)]">space</span>+drag = pan · right-click = meniu (canvas/bulă/<span className="text-[var(--color-danger)]">săgeată</span>) · ctrl+c/v = copy/paste · ctrl+d = duplică · ctrl+z = undo · 2× click pe edge = șterge
+          drag = select · <span className="text-[var(--color-danger)]">space</span>+drag = pan · right-click = meniu · ctrl+c/v = copy/paste · ctrl+d = duplică · ctrl+z = undo · <span className="text-[var(--color-danger)]">2× click pe edge = etichetă</span> · shift+2× click = șterge edge
         </span>
         <span className="text-white/40">
           {nodes.length} noduri · {edges.length} edges

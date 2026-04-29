@@ -61,6 +61,10 @@ Toxic, sticky-note context Butter, side-info Ash.
   "target":      string (target node id),
   "sourceHandle": "yes" | "no" | undefined,
   "label":       string (optional — short text shown on the line),
+  "labelStyle":  { fill: "#ffffff", fontWeight: 800, fontFamily: "JetBrains Mono, monospace", textTransform: "uppercase", letterSpacing: "0.1em", fontSize: 10 },
+  "labelBgStyle": { fill: "#0a0a0a", stroke: "#0a0a0a", strokeWidth: 2 },
+  "labelBgPadding": [10, 5],
+  "labelBgBorderRadius": 0,
   "animated":    boolean (default false),
   "style":       { strokeWidth: 2.5, stroke: "#0a0a0a", strokeDasharray?: "8 4" | "2 4" },
   "markerEnd":   { type: "arrowclosed", color: "#0a0a0a", width: 18, height: 18 },
@@ -69,6 +73,12 @@ Toxic, sticky-note context Butter, side-info Ash.
 
 strokeDasharray: omit for solid · "8 4" for dashed · "2 4" for dotted.
 Use markerStart + markerEnd for bidirectional relationships.
+
+LABELS: edges leaving a "decision" node should ALWAYS have a label
+("YES"/"NO"/"DA"/"NU"/"FAIL"/"RETRY"/...). Always include the labelStyle +
+labelBgStyle + labelBgPadding + labelBgBorderRadius shown above whenever
+you set a label, so it renders with the brutalist black-on-white pill.
+Keep labels SHORT (≤8 chars), uppercase, mono font.
 
 ## Layout hints
 
@@ -92,8 +102,8 @@ Use markerStart + markerEnd for bidirectional relationships.
   ],
   "edges": [
     { "id": "e1", "source": "s",  "target": "d1", "markerEnd": { "type": "arrowclosed", "color": "#0a0a0a" }, "style": { "strokeWidth": 2.5, "stroke": "#0a0a0a" } },
-    { "id": "e2", "source": "d1", "target": "a1", "sourceHandle": "no",  "label": "Da",  "markerEnd": { "type": "arrowclosed", "color": "#0a0a0a" }, "style": { "strokeWidth": 2.5, "stroke": "#0a0a0a" } },
-    { "id": "e3", "source": "d1", "target": "a2", "sourceHandle": "yes", "label": "Nu",  "markerEnd": { "type": "arrowclosed", "color": "#0a0a0a" }, "style": { "strokeWidth": 2.5, "stroke": "#0a0a0a" } },
+    { "id": "e2", "source": "d1", "target": "a1", "sourceHandle": "no",  "label": "DA",  "labelStyle": { "fill": "#ffffff", "fontWeight": 800, "fontFamily": "JetBrains Mono, monospace", "textTransform": "uppercase", "letterSpacing": "0.1em", "fontSize": 10 }, "labelBgStyle": { "fill": "#0a0a0a", "stroke": "#0a0a0a", "strokeWidth": 2 }, "labelBgPadding": [10, 5], "labelBgBorderRadius": 0, "markerEnd": { "type": "arrowclosed", "color": "#0a0a0a" }, "style": { "strokeWidth": 2.5, "stroke": "#0a0a0a" } },
+    { "id": "e3", "source": "d1", "target": "a2", "sourceHandle": "yes", "label": "NU",  "labelStyle": { "fill": "#ffffff", "fontWeight": 800, "fontFamily": "JetBrains Mono, monospace", "textTransform": "uppercase", "letterSpacing": "0.1em", "fontSize": 10 }, "labelBgStyle": { "fill": "#0a0a0a", "stroke": "#0a0a0a", "strokeWidth": 2 }, "labelBgPadding": [10, 5], "labelBgBorderRadius": 0, "markerEnd": { "type": "arrowclosed", "color": "#0a0a0a" }, "style": { "strokeWidth": 2.5, "stroke": "#0a0a0a" } },
     { "id": "e4", "source": "a1", "target": "e",  "markerEnd": { "type": "arrowclosed", "color": "#0a0a0a" }, "style": { "strokeWidth": 2.5, "stroke": "#0a0a0a" } },
     { "id": "e5", "source": "a2", "target": "e",  "markerEnd": { "type": "arrowclosed", "color": "#0a0a0a" }, "style": { "strokeWidth": 2.5, "stroke": "#0a0a0a" } }
   ]

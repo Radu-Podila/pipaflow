@@ -25,12 +25,20 @@
     "source": "node-id",
     "target": "node-id",
     "sourceHandle": "yes | no (only for decision-source edges)",
-    "label": "optional short text on the line",
+    "label": "optional short text on the line (≤8 chars, ALL CAPS recommended)",
+    "labelStyle":   { "fill": "#ffffff", "fontWeight": 800, "fontFamily": "JetBrains Mono, monospace", "textTransform": "uppercase", "letterSpacing": "0.1em", "fontSize": 10 },
+    "labelBgStyle": { "fill": "#0a0a0a", "stroke": "#0a0a0a", "strokeWidth": 2 },
+    "labelBgPadding": [10, 5],
+    "labelBgBorderRadius": 0,
     "animated": false,
     "style": { "strokeWidth": 2.5, "stroke": "#0a0a0a", "strokeDasharray": "8 4" },
     "markerEnd": { "type": "arrowclosed", "color": "#0a0a0a", "width": 18, "height": 18 }
   }]
 }
+
+Note: edges leaving a "decision" node should ALWAYS have a label
+("YES"/"NO"/"FAIL"/"RETRY"/...) — always include the four label* styling
+fields above so labels render as the brutalist black pill.
 ```
 
 ## Node types
