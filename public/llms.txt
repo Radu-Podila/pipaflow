@@ -1,0 +1,87 @@
+# Pipaflow
+
+> Brutalist flow-diagram editor that runs entirely in the browser.
+> Saves and loads `.json` files with a documented schema, so an LLM can
+> generate diagrams that import directly via the "Deschide" button.
+
+## Quick spec
+
+```json
+{
+  "version": 1,
+  "name": "string",
+  "nodes": [{
+    "id": "unique-string",
+    "type": "box | sticky | decision | terminal",
+    "data": {
+      "label": "short text",
+      "variant": "start | end (only for type=terminal)",
+      "fillColor": { "bg": "#hex", "fg": "#hex", "border": "#hex" }
+    },
+    "position": { "x": 300, "y": 60 }
+  }],
+  "edges": [{
+    "id": "unique-string",
+    "source": "node-id",
+    "target": "node-id",
+    "sourceHandle": "yes | no (only for decision-source edges)",
+    "label": "optional short text on the line",
+    "animated": false,
+    "style": { "strokeWidth": 2.5, "stroke": "#0a0a0a", "strokeDasharray": "8 4" },
+    "markerEnd": { "type": "arrowclosed", "color": "#0a0a0a", "width": 18, "height": 18 }
+  }]
+}
+```
+
+## Node types
+
+- `terminal` — start/end pill (`data.variant: "start" | "end"`)
+- `box` — rectangle action (most common)
+- `decision` — diamond fork. Outgoing edges should set `sourceHandle: "yes" | "no"` to pick which side
+- `sticky` — yellow handwritten note (commentary only, no logic)
+
+## Fill color presets
+
+Use any of these for `data.fillColor`:
+
+| Preset | bg | fg |
+|---|---|---|
+| Snow   | #fafafa | #0a0a0a |
+| Ash    | #e5e5e5 | #0a0a0a |
+| Butter | #fff8c5 | #0a0a0a |
+| Flame  | #ea580c | #ffffff |
+| Blush  | #fce7e8 | #0a0a0a |
+| Danger | #e11d3f | #ffffff |
+| Wine   | #7a0e22 | #ffffff |
+| Toxic  | #84cc16 | #0a0a0a |
+| Noir   | #0a0a0a | #ffffff |
+
+(All presets share `border: "#0a0a0a"`.)
+
+## Edge styles
+
+| Visual | strokeDasharray | animated |
+|---|---|---|
+| Solid (default) | omit | false |
+| Dashed          | "8 4" | false |
+| Dotted          | "2 4" | false |
+| Marching ants   | "8 4" | true |
+
+Bidirectional edges set both `markerEnd` and `markerStart`.
+
+## Layout
+
+- Top-down: start ~y=60, +120 per row, x≈300 center
+- Decision branches: "yes" right, "no" left (mirror by x offset of ±200)
+- The app has Dagre auto-layout, so rough positions are fine
+
+## Output rules
+
+- Return ONLY the JSON object (no markdown fences, no commentary)
+- Every `source`/`target` must reference an existing node id
+- Use camelCase exactly (`fillColor`, not `fill_color`; `sourceHandle`, not `source_handle`)
+- Keep node labels under 60 chars; long descriptions go in `sticky` nodes
+
+## Repo
+
+https://github.com/Radu-Podila/pipaflow

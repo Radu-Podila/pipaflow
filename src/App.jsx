@@ -17,6 +17,8 @@ import {
   ArrowLeft,
   ArrowDown,
   ArrowRight as ArrowRightIcon,
+  Bot,
+  Check,
   Download,
   FileJson,
   FilePlus2,
@@ -51,6 +53,7 @@ import {
   writeJsonToHandle,
   saveAsJsonFile,
 } from '@/lib/fsAccess.js';
+import { buildAiPrompt } from '@/lib/aiPrompt.js';
 
 const HISTORY_LIMIT = 50;
 
@@ -168,6 +171,7 @@ function FlowInner({ onBackToHero }) {
   const legacyImportInputRef = useRef(null);
   const clipboardRef = useRef(null);
   const mousePosRef = useRef(null);
+  const [aiCopied, setAiCopied] = useState(false);
 
   const snapshot = useCallback(() => {
     past.current.push({
@@ -623,6 +627,7 @@ function FlowInner({ onBackToHero }) {
     if (fileHandleRef.current) {
       try {
         await writeJsonToHandle(fileHandleRef.current, {
+          version: 1,
           name: currentName,
           nodes,
           edges,
@@ -660,6 +665,7 @@ function FlowInner({ onBackToHero }) {
     }
     try {
       const result = await saveAsJsonFile(`${currentName || 'flow'}.json`, {
+        version: 1,
         name: currentName,
         nodes,
         edges,
@@ -698,8 +704,23 @@ function FlowInner({ onBackToHero }) {
     detachFile();
   };
 
+  const copyAiPrompt = async () => {
+    const prompt = buildAiPrompt({ version: 1, name: currentName, nodes, edges });
+    try {
+      await navigator.clipboard.writeText(prompt);
+      setAiCopied(true);
+      setTimeout(() => setAiCopied(false), 2200);
+    } catch (err) {
+      // Fallback: open in new tab if clipboard refused
+      const blob = new Blob([prompt], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    }
+  };
+
   const exportJson = () => {
-    const data = JSON.stringify({ name: currentName, nodes, edges }, null, 2);
+    const data = JSON.stringify({ version: 1, name: currentName, nodes, edges }, null, 2);
     const blob = new Blob([data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -831,6 +852,24 @@ function FlowInner({ onBackToHero }) {
         </Button>
         <Button onClick={() => exportSvg(currentName, nodes)} size="icon" title="Export SVG">
           <Download className="h-4 w-4" />
+        </Button>
+
+        <Divider />
+
+        <Button
+          variant={aiCopied ? 'primary' : 'default'}
+          onClick={copyAiPrompt}
+          title="Copiază în clipboard un prompt cu schema completă + flowul curent — paste în Claude/GPT/Gemini și AI-ul va genera flowuri compatibile"
+        >
+          {aiCopied ? (
+            <>
+              <Check className="h-3.5 w-3.5" /> Copiat!
+            </>
+          ) : (
+            <>
+              <Bot className="h-3.5 w-3.5" /> Pentru AI
+            </>
+          )}
         </Button>
 
         <input
