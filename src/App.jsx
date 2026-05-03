@@ -56,6 +56,7 @@ import {
   saveAsJsonFile,
 } from '@/lib/fsAccess.js';
 import { buildAiPrompt } from '@/lib/aiPrompt.js';
+import { I18nProvider, useT } from '@/lib/i18n.jsx';
 
 const HISTORY_LIMIT = 50;
 
@@ -78,11 +79,11 @@ const EDGE_COLORS = [
 ];
 
 const PALETTE = [
-  { key: 'start',    kind: 'terminal', variant: 'start', label: 'Start',    dot: '#0a0a0a', sample: 'pill-w' },
-  { key: 'action',   kind: 'box',                        label: 'Acțiune',  dot: '#0a0a0a', sample: 'box-w'  },
-  { key: 'decision', kind: 'decision',                   label: 'Decizie?', dot: '#0a0a0a', sample: 'diamond' },
-  { key: 'end',      kind: 'terminal', variant: 'end',   label: 'Final',    dot: '#e11d3f', sample: 'pill-r' },
-  { key: 'note',     kind: 'sticky',                     label: 'Notă',     dot: '#fbbf24', sample: 'note'   },
+  { key: 'start',    kind: 'terminal', variant: 'start', labelKey: 'palette.start',    dot: '#0a0a0a', sample: 'pill-w' },
+  { key: 'action',   kind: 'box',                        labelKey: 'palette.action',   dot: '#0a0a0a', sample: 'box-w'  },
+  { key: 'decision', kind: 'decision',                   labelKey: 'palette.decision', dot: '#0a0a0a', sample: 'diamond' },
+  { key: 'end',      kind: 'terminal', variant: 'end',   labelKey: 'palette.end',      dot: '#e11d3f', sample: 'pill-r' },
+  { key: 'note',     kind: 'sticky',                     labelKey: 'palette.note',     dot: '#fbbf24', sample: 'note'   },
 ];
 
 // 60-30-10 fill palette — culori care păstrează tematica + 2 hazard accents (verde toxic + portocaliu flame)
@@ -99,37 +100,39 @@ const FILL_COLORS = [
   { key: 'noir',   label: 'Noir',    bg: '#0a0a0a', fg: '#ffffff', border: '#0a0a0a', hint: 'Negru' },
 ];
 
-const initialNodes = [
-  {
-    id: 'n-start',
-    type: 'terminal',
-    data: { label: 'Început', variant: 'start' },
-    position: { x: 280, y: 60 },
-  },
-];
+function makeInitialNodes(label) {
+  return [
+    {
+      id: 'n-start',
+      type: 'terminal',
+      data: { label, variant: 'start' },
+      position: { x: 280, y: 60 },
+    },
+  ];
+}
 
 function makeId(prefix = 'n') {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
-function buildNode(preset, position) {
+function buildNode(preset, position, label) {
   const id = makeId();
   if (preset.kind === 'sticky') {
-    return { id, type: 'sticky', data: { label: preset.label }, position };
+    return { id, type: 'sticky', data: { label }, position };
   }
   if (preset.kind === 'decision') {
-    return { id, type: 'decision', data: { label: preset.label }, position };
+    return { id, type: 'decision', data: { label }, position };
   }
   if (preset.kind === 'terminal') {
     return {
       id,
       type: 'terminal',
-      data: { label: preset.label, variant: preset.variant },
+      data: { label, variant: preset.variant },
       position,
     };
   }
   // box (action)
-  return { id, type: 'box', data: { label: preset.label }, position };
+  return { id, type: 'box', data: { label }, position };
 }
 
 // Backwards-compat: convert legacy default nodes (din versiunea pre-Tailwind) la box
@@ -163,9 +166,10 @@ function PaletteSample({ kind }) {
 }
 
 function FlowInner({ onBackToHero }) {
+  const { t, locale, setLocale } = useT();
   const rf = useReactFlow();
   const wrapperRef = useRef(null);
-  const [nodes, setNodes] = useState(initialNodes);
+  const [nodes, setNodes] = useState(makeInitialNodes(t('palette.start')));
   const [edges, setEdges] = useState([]);
   const [editingNodeId, setEditingNodeId] = useState(null);
   const [editingEdgeId, setEditingEdgeId] = useState(null);
@@ -266,7 +270,7 @@ function FlowInner({ onBackToHero }) {
         y: center.y - 30 + Math.random() * 60,
       };
     }
-    setNodes((nds) => [...nds, buildNode(preset, position)]);
+    setNodes((nds) => [...nds, buildNode(preset, position, t(preset.labelKey))]);
   };
 
   const onPaneContextMenu = useCallback(
@@ -706,7 +710,7 @@ function FlowInner({ onBackToHero }) {
           edges,
         });
       } catch (err) {
-        alert('Nu am putut scrie în fișier: ' + err.message);
+        alert(t('confirms.cantWrite', { err: err.message }));
       }
     }
   };
@@ -727,7 +731,7 @@ function FlowInner({ onBackToHero }) {
       fileHandleRef.current = result.handle;
       setLinkedFile(result.name);
     } catch (err) {
-      alert('Nu am putut deschide fișierul: ' + err.message);
+      alert(t('confirms.cantOpen', { err: err.message }));
     }
   };
 
@@ -749,7 +753,7 @@ function FlowInner({ onBackToHero }) {
       const list = saveFlow(currentName, nodes, edges);
       setSavedFlows(list);
     } catch (err) {
-      alert('Nu am putut salva: ' + err.message);
+      alert(t('confirms.cantSave', { err: err.message }));
     }
   };
 
@@ -765,13 +769,13 @@ function FlowInner({ onBackToHero }) {
 
   const handleDelete = (id, e) => {
     e.stopPropagation();
-    if (!confirm('Șterg flowul „' + id + '"?')) return;
+    if (!confirm(t('confirms.deleteFlow', { name: id }))) return;
     setSavedFlows(deleteFlow(id));
   };
 
   const handleNew = () => {
     snapshot();
-    setNodes(initialNodes);
+    setNodes(makeInitialNodes(t('palette.start')));
     setEdges([]);
     setCurrentName('Flow nou');
     detachFile();
@@ -819,7 +823,7 @@ function FlowInner({ onBackToHero }) {
           setLinkedFile(`${file.name} (read-only)`);
         }
       } catch (err) {
-        alert('JSON invalid: ' + err.message);
+        alert(t('confirms.jsonInvalid', { err: err.message }));
       }
     };
     reader.readAsText(file);
@@ -850,28 +854,45 @@ function FlowInner({ onBackToHero }) {
       {/* ───── Top bar ───── */}
       <header className="flex flex-wrap items-center gap-2 border-b-[3px] border-black bg-white px-4 py-3">
         <Button variant="ghost" size="sm" onClick={onBackToHero}>
-          <ArrowLeft className="h-3.5 w-3.5" /> Acasă
+          <ArrowLeft className="h-3.5 w-3.5" /> {t('toolbar.home')}
         </Button>
+
+        <div className="inline-flex border-[2px] border-black overflow-hidden">
+          {['ro', 'en'].map((loc) => (
+            <button
+              key={loc}
+              onClick={() => setLocale(loc)}
+              className={cn(
+                'px-2.5 h-7 font-mono text-[10px] font-bold uppercase tracking-wider',
+                locale === loc
+                  ? 'bg-black text-white'
+                  : 'bg-white text-black hover:bg-[var(--color-muted)]',
+              )}
+            >
+              {loc}
+            </button>
+          ))}
+        </div>
 
         <Divider />
 
         <Input
           value={currentName}
           onChange={(e) => setCurrentName(e.target.value)}
-          placeholder="Numele flowului"
+          placeholder={t('toolbar.flowName')}
           className="w-44 sm:w-56"
         />
 
         {linkedFile && (
           <span
-            title="Fișier legat — Salvează scrie aici"
+            title={t('toolbar.linkedFile')}
             className="inline-flex h-9 max-w-[280px] items-center gap-1.5 truncate border-[2.5px] border-[var(--color-danger)] bg-[var(--color-danger-glow)] px-2.5 py-0 font-mono text-[10px] font-bold uppercase tracking-wider text-[var(--color-danger-deep)] shadow-[2px_2px_0_0_var(--color-danger-deep)]"
           >
             ⌁ {linkedFile}
             <button
               onClick={detachFile}
               className="ml-1 inline-flex h-4 w-4 items-center justify-center hover:bg-[var(--color-danger)] hover:text-white"
-              title="Detașează"
+              title={t('toolbar.detach')}
             >
               <X className="h-3 w-3" strokeWidth={3} />
             </button>
@@ -880,53 +901,53 @@ function FlowInner({ onBackToHero }) {
 
         <Divider />
 
-        <Button onClick={handleNew} title="Flow nou">
-          <FilePlus2 className="h-3.5 w-3.5" /> Nou
+        <Button onClick={handleNew} title={t('toolbar.newFlowTitle')}>
+          <FilePlus2 className="h-3.5 w-3.5" /> {t('toolbar.newFlow')}
         </Button>
         <Button
           variant="primary"
           onClick={handleSave}
-          title={fileHandleRef.current ? `Salvează în ${linkedFile} + localStorage` : 'Salvează în localStorage'}
+          title={fileHandleRef.current ? `${t('toolbar.saveLinkedTitle')} (${linkedFile})` : t('toolbar.saveLocalTitle')}
         >
-          <Save className="h-3.5 w-3.5" /> Salvează
+          <Save className="h-3.5 w-3.5" /> {t('toolbar.save')}
         </Button>
 
         <Divider />
 
-        <Button size="icon" onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)">
+        <Button size="icon" onClick={undo} disabled={!canUndo} title={t('toolbar.undo')}>
           <Undo2 className="h-4 w-4" />
         </Button>
-        <Button size="icon" onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Shift+Z)">
+        <Button size="icon" onClick={redo} disabled={!canRedo} title={t('toolbar.redo')}>
           <Redo2 className="h-4 w-4" />
         </Button>
 
         <Divider />
 
-        <Button onClick={() => autoLayout('TB')} title="Aranjează vertical">
-          <ArrowDown className="h-3.5 w-3.5" /> Aranjează
+        <Button onClick={() => autoLayout('TB')} title={t('toolbar.arrangeV')}>
+          <ArrowDown className="h-3.5 w-3.5" /> {t('toolbar.arrange')}
         </Button>
-        <Button onClick={() => autoLayout('LR')} title="Aranjează orizontal">
-          <ArrowRightIcon className="h-3.5 w-3.5" /> Orizontal
-        </Button>
-
-        <Divider />
-
-        <Button onClick={openFile} title="Deschide JSON din disk">
-          <FolderOpen className="h-3.5 w-3.5" /> Deschide
-        </Button>
-        <Button onClick={saveAs} title="Salvează ca fișier nou pe disk">
-          <SaveAll className="h-3.5 w-3.5" /> Save as
+        <Button onClick={() => autoLayout('LR')} title={t('toolbar.arrangeHTitle')}>
+          <ArrowRightIcon className="h-3.5 w-3.5" /> {t('toolbar.arrangeH')}
         </Button>
 
         <Divider />
 
-        <Button onClick={exportJson} size="icon" title="Export JSON">
+        <Button onClick={openFile} title={t('toolbar.openTitle')}>
+          <FolderOpen className="h-3.5 w-3.5" /> {t('toolbar.open')}
+        </Button>
+        <Button onClick={saveAs} title={t('toolbar.saveAsTitle')}>
+          <SaveAll className="h-3.5 w-3.5" /> {t('toolbar.saveAs')}
+        </Button>
+
+        <Divider />
+
+        <Button onClick={exportJson} size="icon" title={t('toolbar.exportJson')}>
           <FileJson className="h-4 w-4" />
         </Button>
-        <Button onClick={() => exportPng(currentName, nodes)} size="icon" title="Export PNG">
+        <Button onClick={() => exportPng(currentName, nodes)} size="icon" title={t('toolbar.exportPng')}>
           <ImageIcon className="h-4 w-4" />
         </Button>
-        <Button onClick={() => exportSvg(currentName, nodes)} size="icon" title="Export SVG">
+        <Button onClick={() => exportSvg(currentName, nodes)} size="icon" title={t('toolbar.exportSvg')}>
           <Download className="h-4 w-4" />
         </Button>
 
@@ -935,15 +956,15 @@ function FlowInner({ onBackToHero }) {
         <Button
           variant={aiCopied ? 'primary' : 'default'}
           onClick={copyAiPrompt}
-          title="Copiază în clipboard un prompt cu schema completă + flowul curent — paste în Claude/GPT/Gemini și AI-ul va genera flowuri compatibile"
+          title={t('toolbar.forAiTitle')}
         >
           {aiCopied ? (
             <>
-              <Check className="h-3.5 w-3.5" /> Copiat!
+              <Check className="h-3.5 w-3.5" /> {t('toolbar.copied')}
             </>
           ) : (
             <>
-              <Bot className="h-3.5 w-3.5" /> Pentru AI
+              <Bot className="h-3.5 w-3.5" /> {t('toolbar.forAi')}
             </>
           )}
         </Button>
@@ -951,9 +972,9 @@ function FlowInner({ onBackToHero }) {
         <Button
           variant={showGitHub ? 'primary' : 'default'}
           onClick={() => setShowGitHub((v) => !v)}
-          title="Conectează GitHub pentru versionare"
+          title={t('toolbar.githubTitle')}
         >
-          <GitBranch className="h-3.5 w-3.5" /> GitHub
+          <GitBranch className="h-3.5 w-3.5" /> {t('toolbar.github')}
         </Button>
 
         <input
@@ -966,15 +987,15 @@ function FlowInner({ onBackToHero }) {
 
         <span className="ml-auto" />
 
-        <Button variant="danger" onClick={deleteSelected} title="Șterge selecția (Delete)">
-          <Trash2 className="h-3.5 w-3.5" /> Șterge
+        <Button variant="danger" onClick={deleteSelected} title={t('toolbar.deleteSelection')}>
+          <Trash2 className="h-3.5 w-3.5" /> {t('common.delete')}
         </Button>
       </header>
 
       {/* ───── Palette ───── */}
       <section className="flex flex-wrap items-center gap-2 border-b-[2.5px] border-black bg-[var(--color-card)] px-4 py-2">
         <span className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[var(--color-fg-soft)]">
-          Adaugă →
+          {t('palette.addArrow')}
         </span>
         {PALETTE.map((p) => (
           <button
@@ -992,7 +1013,7 @@ function FlowInner({ onBackToHero }) {
             )}
           >
             <PaletteSample kind={p.sample} />
-            {p.label}
+            {t(p.labelKey)}
           </button>
         ))}
       </section>
@@ -1001,7 +1022,7 @@ function FlowInner({ onBackToHero }) {
       {savedFlows.length > 0 && (
         <section className="flex flex-wrap items-center gap-2 border-b-[2.5px] border-black bg-white px-4 py-2">
           <span className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[var(--color-fg-soft)]">
-            Salvate ↘
+            {t('palette.saved')}
           </span>
           {savedFlows.map((f) => (
             <button
@@ -1076,19 +1097,19 @@ function FlowInner({ onBackToHero }) {
             >
               <div className="flex items-center justify-between border-b-[2.5px] border-black bg-[var(--color-danger)] px-4 py-2 text-white">
                 <span className="font-mono text-[10px] font-bold uppercase tracking-[0.25em]">
-                  ⌁ Etichetă săgeată
+                  {t('modals.edgeLabelHeader')}
                 </span>
                 <button
                   onClick={() => setEditingEdgeId(null)}
                   className="hover:opacity-70"
-                  title="Închide (Esc)"
+                  title={t('common.close')}
                 >
                   <X className="h-4 w-4" strokeWidth={3} />
                 </button>
               </div>
               <div className="flex flex-col gap-3 p-4">
                 <p className="font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-[var(--color-fg-soft)]">
-                  Tipic: „yes" / „no" / „dacă fail" / „retry" — gol = șterge eticheta
+                  {t('modals.edgeLabelHint')}
                 </p>
                 <input
                   autoFocus
@@ -1101,7 +1122,7 @@ function FlowInner({ onBackToHero }) {
                     if (e.key === 'Escape') setEditingEdgeId(null);
                   }}
                   className="w-full border-[2.5px] border-black bg-white p-3 font-mono text-[14px] font-bold uppercase tracking-wider shadow-[3px_3px_0_0_#000] placeholder:text-[var(--color-fg-mute)] placeholder:tracking-wider focus:border-[var(--color-danger)] focus:shadow-[3px_3px_0_0_var(--color-danger-deep)] focus:outline-none"
-                  placeholder="ex: YES"
+                  placeholder={t('modals.edgeLabelPlaceholder')}
                 />
                 <div className="flex items-center justify-between">
                   <button
@@ -1111,10 +1132,10 @@ function FlowInner({ onBackToHero }) {
                     }}
                     className="font-mono text-[10px] font-bold uppercase tracking-wider text-[var(--color-fg-soft)] underline-offset-4 hover:text-[var(--color-danger)] hover:underline"
                   >
-                    Șterge eticheta
+                    {t('modals.edgeLabelDelete')}
                   </button>
                   <Button variant="primary" onClick={() => setEditingEdgeId(null)}>
-                    Gata
+                    {t('common.done')}
                   </Button>
                 </div>
               </div>
@@ -1134,12 +1155,12 @@ function FlowInner({ onBackToHero }) {
             >
               <div className="flex items-center justify-between border-b-[2.5px] border-black bg-[var(--color-danger)] px-4 py-2 text-white">
                 <span className="font-mono text-[10px] font-bold uppercase tracking-[0.25em]">
-                  ▲ Editează text
+                  {t('modals.nodeTextHeader')}
                 </span>
                 <button
                   onClick={() => setEditingNodeId(null)}
                   className="hover:opacity-70"
-                  title="Închide (Esc)"
+                  title={t('common.close')}
                 >
                   <X className="h-4 w-4" strokeWidth={3} />
                 </button>
@@ -1154,7 +1175,7 @@ function FlowInner({ onBackToHero }) {
                 />
                 <div className="flex justify-end">
                   <Button variant="primary" onClick={() => setEditingNodeId(null)}>
-                    Gata
+                    {t('common.done')}
                   </Button>
                 </div>
               </div>
@@ -1174,19 +1195,19 @@ function FlowInner({ onBackToHero }) {
             >
               <div className="flex items-center justify-between border-b-[2.5px] border-black bg-[#fff8c5] px-4 py-2">
                 <span className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#0a0a0a]">
-                  ✎ Notă internă
+                  {t('modals.noteHeader')}
                 </span>
                 <button
                   onClick={() => setEditingNoteNodeId(null)}
                   className="hover:opacity-70"
-                  title="Închide (Esc)"
+                  title={t('common.close')}
                 >
                   <X className="h-4 w-4" strokeWidth={3} />
                 </button>
               </div>
               <div className="flex flex-col gap-3 p-4">
                 <p className="font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-[var(--color-fg-soft)]">
-                  Apare în colțul bulei — hover ca să citești. Gol = șterge nota.
+                  {t('modals.noteHint')}
                 </p>
                 <textarea
                   autoFocus
@@ -1197,7 +1218,7 @@ function FlowInner({ onBackToHero }) {
                     if (e.key === 'Escape') setEditingNoteNodeId(null);
                   }}
                   className="w-full border-[2.5px] border-black bg-[#fffef0] p-3 font-hand text-[14px] leading-snug shadow-[3px_3px_0_0_#000] placeholder:text-[var(--color-fg-mute)] focus:border-[#0a0a0a] focus:outline-none resize-none"
-                  placeholder="Comentariu, context, referință..."
+                  placeholder={t('modals.notePlaceholder')}
                 />
                 <div className="flex items-center justify-between">
                   <button
@@ -1207,10 +1228,10 @@ function FlowInner({ onBackToHero }) {
                     }}
                     className="font-mono text-[10px] font-bold uppercase tracking-wider text-[var(--color-fg-soft)] underline-offset-4 hover:text-[var(--color-danger)] hover:underline"
                   >
-                    Șterge nota
+                    {t('modals.noteDelete')}
                   </button>
                   <Button variant="primary" onClick={() => setEditingNoteNodeId(null)}>
-                    Gata
+                    {t('common.done')}
                   </Button>
                 </div>
               </div>
@@ -1226,7 +1247,7 @@ function FlowInner({ onBackToHero }) {
             onContextMenu={(e) => e.preventDefault()}
           >
             <div className="border-b-2 border-black bg-black px-3 py-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.25em] text-white">
-              Adaugă bulă aici
+              {t('ctxPane.addHere')}
             </div>
             {PALETTE.map((p) => (
               <button
@@ -1238,7 +1259,7 @@ function FlowInner({ onBackToHero }) {
                 className="group flex w-full items-center gap-3 px-3 py-2 text-left font-bold text-[12px] uppercase tracking-wider hover:bg-[var(--color-danger)] hover:text-white"
               >
                 <PaletteSample kind={p.sample} />
-                {p.label}
+                {t(p.labelKey)}
                 <Plus className="ml-auto h-3 w-3 opacity-0 group-hover:opacity-100" strokeWidth={3} />
               </button>
             ))}
@@ -1253,7 +1274,7 @@ function FlowInner({ onBackToHero }) {
             onContextMenu={(e) => e.preventDefault()}
           >
             <div className="border-b-2 border-black bg-black px-3 py-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.25em] text-white">
-              Bulă · Acțiuni
+              {t('ctxNode.header')}
             </div>
 
             <button
@@ -1264,7 +1285,7 @@ function FlowInner({ onBackToHero }) {
               className="flex w-full items-center gap-3 px-3 py-2 text-left font-bold text-[12px] uppercase tracking-wider hover:bg-[var(--color-fg)] hover:text-white"
             >
               <span className="inline-flex h-4 w-4 items-center justify-center border-2 border-current font-mono text-[9px]">A</span>
-              Editează text
+              {t('ctxNode.editText')}
             </button>
 
             <button
@@ -1275,7 +1296,7 @@ function FlowInner({ onBackToHero }) {
               className="flex w-full items-center gap-3 px-3 py-2 text-left font-bold text-[12px] uppercase tracking-wider hover:bg-[var(--color-fg)] hover:text-white"
             >
               <span className="inline-flex h-4 w-4 items-center justify-center border-2 border-current font-mono text-[9px]">+</span>
-              Duplică
+              {t('ctxNode.duplicate')}
             </button>
 
             <button
@@ -1288,14 +1309,14 @@ function FlowInner({ onBackToHero }) {
               <span className="inline-flex h-4 w-4 items-center justify-center border-2 border-current font-mono text-[9px]" style={{ background: '#fff8c5' }}>✎</span>
               {(() => {
                 const n = nodes.find((nd) => nd.id === nodeMenu.nodeId);
-                return n?.data?.note ? 'Editează notă' : 'Adaugă notă';
+                return n?.data?.note ? t('ctxNode.editNote') : t('ctxNode.addNote');
               })()}
             </button>
 
             <div className="my-1 h-[2px] bg-black" />
 
             <div className="px-3 py-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.25em] text-[var(--color-fg-soft)]">
-              Umple cu
+              {t('ctxNode.fillWith')}
             </div>
             <div className="grid grid-cols-5 gap-1 px-2 pb-2">
               {FILL_COLORS.map((c) => (
@@ -1339,7 +1360,7 @@ function FlowInner({ onBackToHero }) {
               className="flex w-full items-center gap-3 px-3 py-2 text-left font-bold text-[12px] uppercase tracking-wider text-[var(--color-danger)] hover:bg-[var(--color-danger)] hover:text-white"
             >
               <Trash2 className="h-3.5 w-3.5" strokeWidth={2.5} />
-              Șterge
+              {t('common.delete')}
             </button>
           </div>
         )}
@@ -1381,30 +1402,30 @@ function FlowInner({ onBackToHero }) {
               onContextMenu={(e) => e.preventDefault()}
             >
               <div className="border-b-2 border-black bg-black px-3 py-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.25em] text-white">
-                Săgeată · Stil
+                {t('ctxEdge.headerStyle')}
               </div>
 
               <StyleBtn
                 active={isSolid}
-                label="Linie continuă"
+                label={t('ctxEdge.solid')}
                 onClick={() => { setEdgeStyle(edgeMenu.edgeId, 'solid'); setEdgeMenu(null); }}
                 preview={<line x1="2" y1="9" x2="38" y2="9" stroke="currentColor" strokeWidth="2.5" />}
               />
               <StyleBtn
                 active={isDashed}
-                label="Punctată"
+                label={t('ctxEdge.dashed')}
                 onClick={() => { setEdgeStyle(edgeMenu.edgeId, 'dashed'); setEdgeMenu(null); }}
                 preview={<line x1="2" y1="9" x2="38" y2="9" stroke="currentColor" strokeWidth="2.5" strokeDasharray="6 3" />}
               />
               <StyleBtn
                 active={isDotted}
-                label="Puncte mici"
+                label={t('ctxEdge.dotted')}
                 onClick={() => { setEdgeStyle(edgeMenu.edgeId, 'dotted'); setEdgeMenu(null); }}
                 preview={<line x1="2" y1="9" x2="38" y2="9" stroke="currentColor" strokeWidth="2.5" strokeDasharray="2 3" strokeLinecap="round" />}
               />
               <StyleBtn
                 active={isAnimated}
-                label="Animată"
+                label={t('ctxEdge.animated')}
                 onClick={() => { setEdgeStyle(edgeMenu.edgeId, 'animated'); setEdgeMenu(null); }}
                 preview={
                   <line
@@ -1420,7 +1441,7 @@ function FlowInner({ onBackToHero }) {
               <div className="my-1 h-[2px] bg-black" />
 
               <div className="px-3 py-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.25em] text-[var(--color-fg-soft)]">
-                Culoare
+                {t('ctxEdge.color')}
               </div>
               <div className="grid grid-cols-8 gap-1 px-2 pb-2">
                 {EDGE_COLORS.map((c) => {
@@ -1451,13 +1472,13 @@ function FlowInner({ onBackToHero }) {
                 <span className="inline-flex h-5 min-w-[36px] items-center justify-center bg-black px-1.5 font-mono text-[9px] font-extrabold uppercase tracking-[0.1em] text-white group-hover:bg-white group-hover:text-black">
                   {ed.label ? ed.label.slice(0, 5) : 'A → B'}
                 </span>
-                {ed.label ? 'Editează etichetă' : 'Adaugă etichetă'}
+                {ed.label ? t('ctxEdge.editLabel') : t('ctxEdge.addLabel')}
               </button>
 
               <div className="my-1 h-[2px] bg-black" />
 
               <div className="px-3 py-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.25em] text-[var(--color-fg-soft)]">
-                Săgeată
+                {t('ctxEdge.arrowSection')}
               </div>
               {(() => {
                 const arrowMode = ed.markerStart && ed.markerEnd
@@ -1495,22 +1516,22 @@ function FlowInner({ onBackToHero }) {
                   <>
                     <ArrowOpt
                       mode="end"
-                      label="La capăt"
+                      label={t('ctxEdge.arrowEnd')}
                       preview={(id) => <line x1="2" y1="7" x2="34" y2="7" stroke="currentColor" strokeWidth="2.5" markerEnd={`url(#${id})`} />}
                     />
                     <ArrowOpt
                       mode="both"
-                      label="Ambele capete"
+                      label={t('ctxEdge.arrowBoth')}
                       preview={(id) => <line x1="6" y1="7" x2="34" y2="7" stroke="currentColor" strokeWidth="2.5" markerStart={`url(#${id})`} markerEnd={`url(#${id})`} />}
                     />
                     <ArrowOpt
                       mode="start"
-                      label="Doar la început"
+                      label={t('ctxEdge.arrowStart')}
                       preview={(id) => <line x1="6" y1="7" x2="38" y2="7" stroke="currentColor" strokeWidth="2.5" markerStart={`url(#${id})`} />}
                     />
                     <ArrowOpt
                       mode="none"
-                      label="Fără săgeată"
+                      label={t('ctxEdge.arrowNone')}
                       preview={() => <line x1="2" y1="7" x2="38" y2="7" stroke="currentColor" strokeWidth="2.5" />}
                     />
                   </>
@@ -1524,7 +1545,7 @@ function FlowInner({ onBackToHero }) {
                 className="flex w-full items-center gap-3 px-3 py-2 text-left font-bold text-[12px] uppercase tracking-wider hover:bg-[var(--color-fg)] hover:text-white"
               >
                 <span className="font-mono text-[14px] leading-none">⇄</span>
-                Inversează direcția
+                {t('ctxEdge.reverse')}
               </button>
 
               <div className="my-1 h-[2px] bg-black" />
@@ -1534,7 +1555,7 @@ function FlowInner({ onBackToHero }) {
                 className="flex w-full items-center gap-3 px-3 py-2 text-left font-bold text-[12px] uppercase tracking-wider text-[var(--color-danger)] hover:bg-[var(--color-danger)] hover:text-white"
               >
                 <Trash2 className="h-3.5 w-3.5" strokeWidth={2.5} />
-                Șterge
+                {t('common.delete')}
               </button>
             </div>
           );
@@ -1560,17 +1581,29 @@ function FlowInner({ onBackToHero }) {
       {/* ───── Status bar ───── */}
       <footer className="flex flex-wrap items-center justify-between gap-3 border-t-[3px] border-black bg-black px-4 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-white">
         <span className="text-white/80">
-          drag = select · <span className="text-[var(--color-danger)]">space</span>+drag = pan · right-click = meniu · ctrl+c/v = copy/paste · ctrl+d = duplică · ctrl+z = undo · <span className="text-[var(--color-danger)]">2× click pe edge = etichetă</span> · shift+2× click = șterge edge
+          {(() => {
+            const raw = t('statusBar.shortcuts', {
+              space: '___SPACE___',
+              dblclick: '___DBL___',
+            });
+            // Split pe markeri ca să stilizăm „space" și „2× click pe edge..."
+            const parts = raw.split(/(___SPACE___|___DBL___)/);
+            return parts.map((p, i) => {
+              if (p === '___SPACE___') return <span key={i} className="text-[var(--color-danger)]">{t('statusBar.space')}</span>;
+              if (p === '___DBL___') return <span key={i} className="text-[var(--color-danger)]">{t('statusBar.dblclick')}</span>;
+              return <span key={i}>{p}</span>;
+            });
+          })()}
         </span>
         <span className="text-white/40">
-          {nodes.length} noduri · {edges.length} edges
+          {t('statusBar.stats', { nodes: nodes.length, edges: edges.length })}
         </span>
       </footer>
     </div>
   );
 }
 
-export default function App() {
+function AppInner() {
   const [view, setView] = useState(() => {
     if (typeof window === 'undefined') return 'hero';
     const seen = localStorage.getItem('pipaflow_seen_hero');
@@ -1590,5 +1623,13 @@ export default function App() {
     <ReactFlowProvider>
       <FlowInner onBackToHero={() => setView('hero')} />
     </ReactFlowProvider>
+  );
+}
+
+export default function App() {
+  return (
+    <I18nProvider>
+      <AppInner />
+    </I18nProvider>
   );
 }

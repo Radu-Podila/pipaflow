@@ -12,6 +12,7 @@ import {
 import { getUser, getFile, saveFile, listCommits, getFileAtCommit } from '@/lib/github';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useT } from '@/lib/i18n.jsx';
 
 const LS_TOKEN = 'pipaflow_gh_token';
 const LS_REPO  = 'pipaflow_gh_repo';
@@ -28,6 +29,7 @@ function relativeDate(iso) {
 }
 
 export function GitHubPanel({ flowName, nodes, edges, onLoad, onClose }) {
+  const { t } = useT();
   const [tokenInput, setTokenInput] = useState('');
   const [token, setToken]           = useState('');
   const [user, setUser]             = useState(null);
@@ -40,30 +42,30 @@ export function GitHubPanel({ flowName, nodes, edges, onLoad, onClose }) {
   const [status, setStatus]         = useState(null); // {type:'ok'|'err'|'busy', text}
 
   useEffect(() => {
-    const t = localStorage.getItem(LS_TOKEN);
+    const tk = localStorage.getItem(LS_TOKEN);
     const r = localStorage.getItem(LS_REPO);
     const p = localStorage.getItem(LS_PATH);
     if (r) setRepo(r);
     setFilePath(p || `flows/${(flowName || 'flow').toLowerCase().replace(/\s+/g, '-')}.json`);
-    if (t) {
-      setToken(t);
-      getUser(t).then(setUser).catch(() => {
+    if (tk) {
+      setToken(tk);
+      getUser(tk).then(setUser).catch(() => {
         localStorage.removeItem(LS_TOKEN);
       });
     }
   }, []);
 
   async function handleConnect() {
-    const t = tokenInput.trim();
-    if (!t) return;
-    setStatus({ type: 'busy', text: 'Verifică token...' });
+    const tk = tokenInput.trim();
+    if (!tk) return;
+    setStatus({ type: 'busy', text: t('github.checking') });
     try {
-      const u = await getUser(t);
-      setToken(t);
+      const u = await getUser(tk);
+      setToken(tk);
       setUser(u);
       setTokenInput('');
-      localStorage.setItem(LS_TOKEN, t);
-      setStatus({ type: 'ok', text: `Conectat ca @${u.login}` });
+      localStorage.setItem(LS_TOKEN, tk);
+      setStatus({ type: 'ok', text: t('github.connected', { login: u.login }) });
     } catch (e) {
       setStatus({ type: 'err', text: e.message });
     }
@@ -71,7 +73,7 @@ export function GitHubPanel({ flowName, nodes, edges, onLoad, onClose }) {
 
   async function handleSave() {
     if (!repo.includes('/') || !filePath) return;
-    setStatus({ type: 'busy', text: 'Se salvează...' });
+    setStatus({ type: 'busy', text: t('github.saving') });
     const [owner, repoName] = repo.split('/');
     const content = JSON.stringify({ version: 1, name: flowName, nodes, edges }, null, 2);
     const message = commitMsg.trim() || `Update ${flowName}`;
@@ -85,7 +87,7 @@ export function GitHubPanel({ flowName, nodes, edges, onLoad, onClose }) {
       localStorage.setItem(LS_REPO, repo);
       localStorage.setItem(LS_PATH, filePath);
       setCommitMsg('');
-      setStatus({ type: 'ok', text: 'Salvat pe GitHub ✓' });
+      setStatus({ type: 'ok', text: t('github.saved') });
       setTimeout(() => setStatus(null), 3000);
       const updated = await getFile(token, owner, repoName, filePath);
       setFileSha(updated?.sha ?? null);
@@ -97,7 +99,7 @@ export function GitHubPanel({ flowName, nodes, edges, onLoad, onClose }) {
 
   async function fetchCommits() {
     const [owner, repoName] = repo.split('/');
-    setStatus({ type: 'busy', text: 'Încarcă istoricul...' });
+    setStatus({ type: 'busy', text: t('github.historyLoading') });
     try {
       const data = await listCommits(token, owner, repoName, filePath);
       setCommits(data);
@@ -109,11 +111,11 @@ export function GitHubPanel({ flowName, nodes, edges, onLoad, onClose }) {
 
   async function handleLoadCommit(sha) {
     const [owner, repoName] = repo.split('/');
-    setStatus({ type: 'busy', text: 'Încarcă versiunea...' });
+    setStatus({ type: 'busy', text: t('github.loadingVersion') });
     try {
       const text = await getFileAtCommit(token, owner, repoName, sha, filePath);
       onLoad(JSON.parse(text));
-      setStatus({ type: 'ok', text: 'Versiune încărcată ✓' });
+      setStatus({ type: 'ok', text: t('github.versionLoaded') });
       setTimeout(() => setStatus(null), 2500);
     } catch (e) {
       setStatus({ type: 'err', text: e.message });
@@ -132,7 +134,7 @@ export function GitHubPanel({ flowName, nodes, edges, onLoad, onClose }) {
         <div className="flex items-center gap-2">
           <GitBranch className="h-4 w-4 text-white" />
           <span className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-white">
-            GitHub · Versionare
+            {t('github.header')}
           </span>
         </div>
         <button onClick={onClose} className="text-white/50 hover:text-white">
@@ -145,7 +147,7 @@ export function GitHubPanel({ flowName, nodes, edges, onLoad, onClose }) {
           /* ── Connect ── */
           <div className="flex flex-col gap-3">
             <p className="font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-[var(--color-fg-soft)]">
-              1. Generează un Personal Access Token
+              {t('github.step1')}
             </p>
             <a
               href="https://github.com/settings/tokens/new?scopes=repo&description=Pipaflow"
@@ -154,22 +156,26 @@ export function GitHubPanel({ flowName, nodes, edges, onLoad, onClose }) {
               className="inline-flex items-center gap-2 border-[2.5px] border-black bg-white px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-wider shadow-[3px_3px_0_0_#000] transition-all hover:-translate-x-px hover:-translate-y-px hover:shadow-[4px_4px_0_0_#000]"
             >
               <ExternalLink className="h-3.5 w-3.5" />
-              GitHub → Tokens (Classic)
+              {t('github.ghLink')}
             </a>
-            <p className="font-mono text-[9px] leading-relaxed text-[var(--color-fg-mute)]">
-              Bifează <strong>repo</strong> pentru repo-uri private, sau <strong>public_repo</strong> pentru
-              doar publice. Fine-grained PATs merg și mai bine — alege <em>Contents: Read &amp; Write</em>.
-            </p>
+            <p
+              className="font-mono text-[9px] leading-relaxed text-[var(--color-fg-mute)]"
+              dangerouslySetInnerHTML={{
+                __html: t('github.step1Hint')
+                  .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                  .replace(/_(.+?)_/g, '<em>$1</em>'),
+              }}
+            />
 
             <p className="font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-[var(--color-fg-soft)]">
-              2. Lipește token-ul
+              {t('github.step2')}
             </p>
             <input
               type="password"
               value={tokenInput}
               onChange={(e) => setTokenInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleConnect()}
-              placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+              placeholder={t('github.tokenPlaceholder')}
               className="w-full border-[2.5px] border-black p-2.5 font-mono text-[12px] shadow-[2px_2px_0_0_#000] placeholder:text-[var(--color-fg-mute)] focus:border-[var(--color-danger)] focus:outline-none"
             />
             <Button
@@ -177,7 +183,7 @@ export function GitHubPanel({ flowName, nodes, edges, onLoad, onClose }) {
               onClick={handleConnect}
               disabled={!tokenInput.trim()}
             >
-              Conectează
+              {t('github.connect')}
             </Button>
           </div>
         ) : (
@@ -200,28 +206,28 @@ export function GitHubPanel({ flowName, nodes, edges, onLoad, onClose }) {
                 onClick={disconnect}
                 className="font-mono text-[9px] font-bold uppercase text-[var(--color-fg-mute)] hover:text-[var(--color-danger)]"
               >
-                Logout
+                {t('common.logout')}
               </button>
             </div>
 
             {/* Repo + path */}
             <div className="flex flex-col gap-2">
               <label className="font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-[var(--color-fg-soft)]">
-                Repository
+                {t('github.repoLabel')}
               </label>
               <input
                 value={repo}
                 onChange={(e) => setRepo(e.target.value)}
-                placeholder="username/repo-name"
+                placeholder={t('github.repoPlaceholder')}
                 className="w-full border-[2.5px] border-black p-2 font-mono text-[12px] shadow-[2px_2px_0_0_#000] focus:border-black focus:outline-none"
               />
               <label className="font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-[var(--color-fg-soft)]">
-                Cale fișier în repo
+                {t('github.pathLabel')}
               </label>
               <input
                 value={filePath}
                 onChange={(e) => setFilePath(e.target.value)}
-                placeholder="flows/flow.json"
+                placeholder={t('github.pathPlaceholder')}
                 className="w-full border-[2.5px] border-black p-2 font-mono text-[12px] shadow-[2px_2px_0_0_#000] focus:border-black focus:outline-none"
               />
             </div>
@@ -229,13 +235,13 @@ export function GitHubPanel({ flowName, nodes, edges, onLoad, onClose }) {
             {/* Commit message */}
             <div className="flex flex-col gap-1.5">
               <label className="font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-[var(--color-fg-soft)]">
-                Mesaj commit
+                {t('github.commitLabel')}
               </label>
               <input
                 value={commitMsg}
                 onChange={(e) => setCommitMsg(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSave()}
-                placeholder={`Update ${flowName}`}
+                placeholder={t('github.commitPlaceholder', { name: flowName })}
                 className="w-full border-[2.5px] border-black p-2 font-mono text-[12px] shadow-[2px_2px_0_0_#000] focus:border-black focus:outline-none"
               />
             </div>
@@ -245,7 +251,7 @@ export function GitHubPanel({ flowName, nodes, edges, onLoad, onClose }) {
               onClick={handleSave}
               disabled={!repo.includes('/') || !filePath}
             >
-              <Save className="h-3.5 w-3.5" /> Salvează versiune
+              <Save className="h-3.5 w-3.5" /> {t('github.saveVersion')}
             </Button>
 
             {/* History accordion */}
@@ -259,7 +265,7 @@ export function GitHubPanel({ flowName, nodes, edges, onLoad, onClose }) {
                 className="flex w-full items-center justify-between px-3 py-2.5 font-mono text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-black hover:text-white"
               >
                 <span className="flex items-center gap-2">
-                  <Clock className="h-3.5 w-3.5" /> Istoric versiuni
+                  <Clock className="h-3.5 w-3.5" /> {t('github.historyTitle')}
                 </span>
                 <span className="flex items-center gap-1.5">
                   {showHistory && (
@@ -276,7 +282,7 @@ export function GitHubPanel({ flowName, nodes, edges, onLoad, onClose }) {
                 <div className="max-h-[300px] divide-y-[1.5px] divide-black/15 overflow-y-auto border-t-[2px] border-black">
                   {commits.length === 0 ? (
                     <p className="px-3 py-3 font-mono text-[10px] text-[var(--color-fg-mute)]">
-                      Niciun commit găsit pe această cale.
+                      {t('github.historyEmpty')}
                     </p>
                   ) : (
                     commits.map((c) => (
@@ -296,7 +302,7 @@ export function GitHubPanel({ flowName, nodes, edges, onLoad, onClose }) {
                           onClick={() => handleLoadCommit(c.sha)}
                           className="shrink-0 border-[2px] border-black px-2 py-0.5 font-mono text-[9px] font-bold uppercase hover:bg-black hover:text-white"
                         >
-                          Load
+                          {t('github.load')}
                         </button>
                       </div>
                     ))

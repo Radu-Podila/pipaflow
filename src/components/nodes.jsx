@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import { Handle, NodeResizer, Position } from '@xyflow/react';
 import { cn } from '@/lib/utils';
+import { useT } from '@/lib/i18n.jsx';
 
 const HANDLE_CLASS =
   '!w-[10px] !h-[10px] !bg-black !border-2 !border-white !rounded-none';
@@ -79,6 +80,7 @@ export const BoxNode = memo(function BoxNode({ data, selected }) {
 });
 
 export const StickyNote = memo(function StickyNote({ data, selected }) {
+  const { t } = useT();
   const style = fillStyle(data.fillColor, {
     background: '#fff8c5',
     color: '#0a0a0a',
@@ -105,13 +107,14 @@ export const StickyNote = memo(function StickyNote({ data, selected }) {
           selected && 'rotate-0 outline-3 outline-offset-3 outline-[var(--color-danger)]',
         )}
       >
-        {data.label || 'Notă'}
+        {data.label || t('nodes.noteDefault')}
       </div>
     </>
   );
 });
 
 export const DecisionNode = memo(function DecisionNode({ data, selected }) {
+  const { t } = useT();
   const style = fillStyle(data.fillColor, {
     background: '#ffffff',
     color: '#0a0a0a',
@@ -151,7 +154,7 @@ export const DecisionNode = memo(function DecisionNode({ data, selected }) {
           style={{ color: style.color }}
           className="relative z-10 text-center font-display text-[13px] font-extrabold uppercase tracking-tight break-words"
         >
-          {data.label || 'Decizie?'}
+          {data.label || t('nodes.decisionDefault')}
         </span>
       </div>
       {data.note && (

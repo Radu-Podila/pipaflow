@@ -42,9 +42,6 @@ npm run preview
 - [ ] (opțional) Cloud sync via Supabase
 - [ ] Export Mermaid / PlantUML
 
-## Origini
-
-Extras din [snipetly](https://github.com/) pe 2026-04-29 (`/flow` page → standalone).
 
 ## Licență
 
